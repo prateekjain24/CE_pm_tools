@@ -1,4 +1,5 @@
 import "~/styles/globals.css"
+import { Badge, Button, Card } from "~/components/common"
 
 export default function Popup() {
   const openDashboard = () => {
@@ -11,83 +12,47 @@ export default function Popup() {
 
   return (
     <div className="popup-container">
-      <h3 style={{ marginBottom: "1rem", fontSize: "1.125rem" }}>PM Dashboard</h3>
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">PM Dashboard</h3>
+        <p className="text-sm text-gray-600">Your productivity command center</p>
+      </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <button
-          type="button"
-          onClick={openDashboard}
-          style={{
-            padding: "0.75rem",
-            backgroundColor: "#0066cc",
-            color: "white",
-            border: "none",
-            borderRadius: "0.375rem",
-            fontSize: "0.875rem",
-            fontWeight: "500",
-            cursor: "pointer",
-            transition: "background-color 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#0052a3"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#0066cc"
-          }}
-        >
+      <div className="space-y-2 mb-4">
+        <Button onClick={openDashboard} fullWidth>
           Open Dashboard
-        </button>
-
-        <button
-          type="button"
-          onClick={openOptions}
-          style={{
-            padding: "0.75rem",
-            backgroundColor: "#f3f4f6",
-            color: "#374151",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.375rem",
-            fontSize: "0.875rem",
-            fontWeight: "500",
-            cursor: "pointer",
-            transition: "background-color 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#e5e7eb"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#f3f4f6"
-          }}
-        >
+        </Button>
+        <Button variant="secondary" onClick={openOptions} fullWidth>
           Settings
-        </button>
+        </Button>
       </div>
 
-      <div
-        style={{
-          marginTop: "1rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid #e5e7eb",
-        }}
-      >
-        <h4 style={{ fontSize: "0.875rem", marginBottom: "0.5rem" }}>Quick Tools</h4>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>• RICE Calculator</div>
-          <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>• ROI Calculator</div>
-          <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>• A/B Test Calculator</div>
+      <Card noPadding className="mb-4">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h4 className="text-sm font-medium text-gray-900">Quick Tools</h4>
         </div>
-      </div>
+        <div className="px-4 py-2 space-y-2">
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm text-gray-700">RICE Calculator</span>
+            <Badge size="sm" variant="primary">
+              New
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm text-gray-700">ROI Calculator</span>
+            <Badge size="sm" variant="default">
+              Pro
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm text-gray-700">A/B Test Calculator</span>
+            <Badge size="sm" variant="default">
+              Pro
+            </Badge>
+          </div>
+        </div>
+      </Card>
 
-      <footer
-        style={{
-          marginTop: "1rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid #e5e7eb",
-          fontSize: "0.75rem",
-          color: "#9ca3af",
-          textAlign: "center",
-        }}
-      >
+      <footer className="text-center text-xs text-gray-500 pt-4 border-t border-gray-200">
         PM Dashboard v0.0.1
       </footer>
     </div>

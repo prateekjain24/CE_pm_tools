@@ -1,4 +1,7 @@
 import { Storage } from "@plasmohq/storage"
+import { DEFAULT_USER_SETTINGS } from "~/types"
+import type { MessageResponse } from "~/types/messages"
+import { createErrorResponse, createSuccessResponse, isMessageRequest } from "~/types/messages"
 
 // Initialize storage with local area
 const _storage = new Storage({ area: "local" })
@@ -10,13 +13,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Set default settings on first install
   if (details.reason === "install") {
     chrome.storage.sync.set({
-      userSettings: {
-        refreshInterval: 15,
-        theme: "light",
-        productHuntEnabled: true,
-        hackerNewsEnabled: true,
-        jiraEnabled: false,
-      },
+      userSettings: DEFAULT_USER_SETTINGS,
     })
   }
 
@@ -41,33 +38,54 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 })
 
 // Message handler for communication with content scripts and popup
-chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  console.log("Message received:", request.type)
+chrome.runtime.onMessage.addListener(
+  (
+    request: unknown,
+    _sender: chrome.runtime.MessageSender,
+    sendResponse: (response: MessageResponse) => void
+  ) => {
+    // Validate request
+    if (!isMessageRequest(request)) {
+      sendResponse(createErrorResponse("Invalid message format"))
+      return
+    }
 
-  switch (request.type) {
-    case "FETCH_FEED":
-      // Handle feed fetch requests
-      sendResponse({ success: true, message: "Feed fetch initiated" })
-      break
+    console.log("Message received:", request.type)
 
-    case "GET_SETTINGS":
-      // Return current settings
-      chrome.storage.sync.get(["userSettings"], (result) => {
-        sendResponse({ success: true, data: result.userSettings })
-      })
-      return true // Keep message channel open for async response
+    switch (request.type) {
+      case "FETCH_FEED":
+        // Handle feed fetch requests
+        sendResponse(
+          createSuccessResponse({
+            itemsCount: 0,
+            metadata: {
+              source: request.feed,
+              lastUpdated: Date.now(),
+              itemCount: 0,
+            },
+          })
+        )
+        break
 
-    case "UPDATE_SETTINGS":
-      // Update settings
-      chrome.storage.sync.set({ userSettings: request.data }, () => {
-        sendResponse({ success: true, message: "Settings updated" })
-      })
-      return true
+      case "GET_SETTINGS":
+        // Return current settings
+        chrome.storage.sync.get(["userSettings"], (result) => {
+          sendResponse(createSuccessResponse(result.userSettings || DEFAULT_USER_SETTINGS))
+        })
+        return true // Keep message channel open for async response
 
-    default:
-      sendResponse({ success: false, error: "Unknown message type" })
+      case "UPDATE_SETTINGS":
+        // Update settings
+        chrome.storage.sync.set({ userSettings: request.data }, () => {
+          sendResponse(createSuccessResponse(undefined))
+        })
+        return true
+
+      default:
+        sendResponse(createErrorResponse("Unknown message type"))
+    }
   }
-})
+)
 
 // Handle extension update
 chrome.runtime.onUpdateAvailable.addListener((details) => {
