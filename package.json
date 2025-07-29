@@ -1,8 +1,8 @@
 {
   "name": "pm-dashboard",
-  "displayName": "Pm dashboard",
+  "displayName": "PM Dashboard",
   "version": "0.0.1",
-  "description": "A basic Plasmo extension.",
+  "description": "A comprehensive dashboard for Product Managers",
   "author": "prateek",
   "scripts": {
     "dev": "plasmo dev",
@@ -24,11 +24,16 @@
     "typescript": "5.3.3"
   },
   "manifest": {
-    "host_permissions": [
-      "https://*/*"
-    ],
     "permissions": [
-      "tabs"
+      "storage",
+      "alarms",
+      "activeTab",
+      "clipboardWrite"
+    ],
+    "host_permissions": [
+      "https://api.producthunt.com/*",
+      "https://hacker-news.firebaseio.com/*",
+      "https://*.atlassian.net/*"
     ]
   }
 }
