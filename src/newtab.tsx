@@ -11,8 +11,9 @@ function IndexNewtab() {
       style={{
         padding: 16,
         display: "flex",
-        flexDirection: "column"
-      }}>
+        flexDirection: "column",
+      }}
+    >
       <h1>
         Welcome to your <a href="https://www.plasmo.com">Plasmo</a> Extension!
       </h1>

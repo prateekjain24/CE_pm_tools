@@ -121,50 +121,72 @@ Establish the foundational architecture and development environment for the PM D
 
 ---
 
-## Story 1.2: Development Environment Setup
+## Story 1.2: Development Environment Setup ✅
 **Description:** Configure development tools, linting, formatting, and git hooks for consistent code quality.
 
 **Acceptance Criteria:**
-- ESLint and Prettier configured for TypeScript/React
-- Pre-commit hooks running on git commit
-- Environment variables properly configured
-- VS Code settings optimized for project
+- ✅ Biome configured for TypeScript/React (replaced ESLint and Prettier)
+- ✅ Pre-commit hooks running on git commit
+- ✅ Environment variables properly configured
+- ✅ VS Code settings optimized for project
 
 ### Tickets:
 
-#### Ticket 1.2.1: Configure ESLint and Prettier
-- **Description:** Setup ESLint with TypeScript/React rules and Prettier for code formatting
+#### Ticket 1.2.1: Configure Biome (replaced ESLint and Prettier) ✅
+- **Description:** Setup Biome for linting and formatting TypeScript/React code
 - **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Install @typescript-eslint/parser and plugins
-  - Configure React hooks rules
-  - Setup Prettier with consistent formatting rules
-  - Ensure ESLint and Prettier work together
+  - Install @biomejs/biome
+  - Configure biome.json with TypeScript/React rules
+  - Setup formatting rules (2 spaces, semicolons optional, etc.)
+  - Add lint, format, and check scripts to package.json
 - **Dependencies:** 1.1.1
+- **Status:** COMPLETED - Biome configured with comprehensive rules
 - **Implementation Notes:**
   ```bash
-  pnpm add -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
-  pnpm add -D eslint-plugin-react eslint-plugin-react-hooks
-  pnpm add -D prettier eslint-config-prettier
+  pnpm remove prettier @ianvs/prettier-plugin-sort-imports
+  pnpm add -D @biomejs/biome
+  ```
+  ```json
+  // biome.json - Fast all-in-one linter and formatter
+  {
+    "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
+    "formatter": {
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 100
+    },
+    "linter": {
+      "rules": {
+        "recommended": true
+      }
+    }
+  }
   ```
 
-#### Ticket 1.2.2: Setup Git Hooks with Husky
+#### Ticket 1.2.2: Setup Git Hooks with Husky ✅
 - **Description:** Configure pre-commit hooks to run linting and formatting
 - **Story Points:** 1 SP
 - **Technical Requirements:**
   - Install and configure Husky
   - Setup lint-staged for efficient linting
-  - Add pre-commit hook for ESLint and Prettier
+  - Add pre-commit hook for Biome
   - Test hooks work on commit
 - **Dependencies:** 1.2.1
+- **Status:** COMPLETED - Husky pre-commit hook runs Biome on staged files
 - **Implementation Notes:**
   ```bash
   pnpm add -D husky lint-staged
-  pnpm husky install
-  pnpm husky add .husky/pre-commit "pnpm lint-staged"
+  pnpm husky init
+  ```
+  ```json
+  // package.json
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json}": ["biome check --write"]
+  }
   ```
 
-#### Ticket 1.2.3: Create Environment Configuration
+#### Ticket 1.2.3: Create Environment Configuration ✅
 - **Description:** Setup .env files for development and production environments
 - **Story Points:** 1 SP
 - **Technical Requirements:**
@@ -173,14 +195,20 @@ Establish the foundational architecture and development environment for the PM D
   - Document available environment variables
   - Test env var loading in code
 - **Dependencies:** 1.1.3
+- **Status:** COMPLETED - Environment files created with example documentation
 - **Implementation Notes:**
+  Created three environment files:
+  - `.env.development` - Development environment variables
+  - `.env.production` - Production environment variables  
+  - `.env.example` - Example file with documentation
+  
   ```bash
   # .env.development
   PLASMO_PUBLIC_API_URL=http://localhost:3000
   PLASMO_PUBLIC_JIRA_CLIENT_ID=dev-client-id
-  
-  # .env.production
-  PLASMO_PUBLIC_API_URL=https://api.pmdashboard.com
+  PLASMO_PUBLIC_PRODUCT_HUNT_API_KEY=
+  PLASMO_PUBLIC_GITHUB_TOKEN=
+  PLASMO_PUBLIC_ANALYTICS_KEY=dev-analytics-key
   ```
 
 ---
