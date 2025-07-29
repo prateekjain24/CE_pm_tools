@@ -213,18 +213,18 @@ Establish the foundational architecture and development environment for the PM D
 
 ---
 
-## Story 1.3: Core File Structure
+## Story 1.3: Core File Structure ✅
 **Description:** Create the foundational directory structure and placeholder files for the extension.
 
 **Acceptance Criteria:**
-- All required directories created under src/
-- Main entry point files created with basic structure
-- Background service worker configured
-- File organization follows Plasmo conventions
+- ✅ All required directories created under src/
+- ✅ Main entry point files created with basic structure
+- ✅ Background service worker configured
+- ✅ File organization follows Plasmo conventions
 
 ### Tickets:
 
-#### Ticket 1.3.1: Create Directory Structure
+#### Ticket 1.3.1: Create Directory Structure ✅
 - **Description:** Setup all required folders under src/ directory
 - **Story Points:** 1 SP
 - **Technical Requirements:**
@@ -233,15 +233,26 @@ Establish the foundational architecture and development environment for the PM D
   - Create background/messages/ directory structure
   - Ensure assets/ stays in root (Plasmo requirement)
 - **Dependencies:** 1.1.1
+- **Status:** COMPLETED - All directories created with proper structure
 - **Implementation Notes:**
   ```bash
-  mkdir -p src/{components/{widgets,common},lib,types,contents,tabs}
-  mkdir -p src/background/messages
+  mkdir -p src/{components/{widgets,common},lib,types,background/messages,tabs,styles}
   mkdir -p assets/icons
   ```
+  
+  Created directory structure:
+  - `src/components/` - React components
+    - `widgets/` - Dashboard widgets
+    - `common/` - Reusable components
+  - `src/lib/` - Utility functions
+  - `src/types/` - TypeScript types
+  - `src/background/messages/` - Message handlers
+  - `src/tabs/` - Custom tab pages
+  - `src/styles/` - Global styles
+  - `assets/icons/` - Extension icons
 
-#### Ticket 1.3.2: Create Main Entry Files
-- **Description:** Create placeholder files for newtab.tsx, popup.tsx, and options.tsx
+#### Ticket 1.3.2: Create Main Entry Files ✅
+- **Description:** Update entry files with PM Dashboard specific content
 - **Story Points:** 1 SP
 - **Technical Requirements:**
   - Create basic React component for each file
@@ -249,22 +260,34 @@ Establish the foundational architecture and development environment for the PM D
   - Include basic styling
   - Ensure hot reload works for each
 - **Dependencies:** 1.3.1
+- **Status:** COMPLETED - All entry files updated with PM Dashboard UI
 - **Implementation Notes:**
-  ```typescript
-  // src/newtab.tsx
-  import React from "react"
-  import "~/styles/globals.css"
   
-  export default function NewTab() {
-    return (
-      <div className="dashboard">
-        <h1>PM Dashboard</h1>
-      </div>
-    )
-  }
-  ```
+  **Updated Files:**
+  1. **newtab.tsx** - Main dashboard with grid layout for widgets
+     - PM Dashboard header with tagline
+     - Grid layout for calculators and feeds
+     - Clean, minimal design
+  
+  2. **popup.tsx** - Quick actions menu (320px wide)
+     - Open Dashboard button
+     - Settings button
+     - Quick tools list
+     - Version footer
+  
+  3. **options.tsx** - Settings page
+     - General settings (refresh interval, theme)
+     - Feed toggles (Product Hunt, Hacker News, Jira)
+     - API keys section (placeholder)
+     - Save functionality with Chrome storage
+  
+  4. **styles/globals.css** - Moved from style.css
+     - Modern reset and base styles
+     - Typography system
+     - Utility classes
+     - Extension-specific styles
 
-#### Ticket 1.3.3: Setup Background Service Worker
+#### Ticket 1.3.3: Setup Background Service Worker ✅
 - **Description:** Create background.ts with basic service worker structure and alarm setup
 - **Story Points:** 2 SP
 - **Technical Requirements:**
@@ -273,26 +296,34 @@ Establish the foundational architecture and development environment for the PM D
   - Configure basic alarm for feed updates
   - Add message handling structure
 - **Dependencies:** 1.3.1
+- **Status:** COMPLETED - Background service worker configured with alarms and messaging
 - **Implementation Notes:**
-  ```typescript
-  // src/background.ts
-  import { Storage } from "@plasmohq/storage"
   
-  const storage = new Storage({ area: "local" })
-  
-  chrome.runtime.onInstalled.addListener(() => {
-    chrome.alarms.create("fetch-feeds", {
-      delayInMinutes: 1,
-      periodInMinutes: 15
-    })
-  })
-  
-  chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === "fetch-feeds") {
-      // Feed fetching logic will be implemented later
-    }
-  })
+  **Installed dependency:**
+  ```bash
+  pnpm add @plasmohq/storage
   ```
+  
+  **Background service worker features:**
+  1. **Storage initialization** - Using Plasmo storage wrapper
+  2. **Installation handler**:
+     - Sets default settings on first install
+     - Creates feed update alarm
+  3. **Alarm system**:
+     - "fetch-feeds" alarm - runs every 15 minutes
+     - First run after 1 minute
+  4. **Message handling**:
+     - FETCH_FEED - Initiates feed fetch
+     - GET_SETTINGS - Returns user settings
+     - UPDATE_SETTINGS - Updates settings
+  5. **Update handler** - Logs available updates
+  
+  **Chrome APIs used:**
+  - chrome.runtime.onInstalled
+  - chrome.alarms.create/onAlarm
+  - chrome.runtime.onMessage
+  - chrome.storage.sync
+  - chrome.runtime.onUpdateAvailable
 
 ---
 
