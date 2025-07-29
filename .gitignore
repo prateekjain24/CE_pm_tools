@@ -1,39 +1,44 @@
+# Sensitive files
+keys.json
+.env*
 
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Build outputs
+build/
+dist/
+.plasmo/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Dependencies
+node_modules/
 
-# testing
-/coverage
-
-#cache
-.turbo
-
-# misc
+# System files
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Log files
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# local env files
-.env*
+# Temporary files
+*.tmp
+*.temp
+.cache/
 
-out/
-build/
-dist/
+# Chrome extension specific
+*.pem
+*.crx
 
-# plasmo - https://www.plasmo.com
-.plasmo
+# TypeScript
+*.tsbuildinfo
 
-# bpp - http://bpp.browser.market/
-keys.json
-
-# typescript
-.tsbuildinfo
+# Testing
+coverage/
+.nyc_output/
