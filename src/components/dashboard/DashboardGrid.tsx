@@ -1,0 +1,101 @@
+import { useEffect, useRef, useState } from "react"
+import { calculateResponsiveLayout } from "~/lib/dashboard/defaultLayout"
+import type { WidgetConfig } from "~/types"
+import { WidgetContainer } from "./WidgetContainer"
+
+interface DashboardGridProps {
+  layout: WidgetConfig[]
+  onLayoutChange: (layout: WidgetConfig[]) => void
+}
+
+export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [isClient, setIsClient] = useState(false)
+  const [screenWidth, setScreenWidth] = useState(1200)
+
+  // Handle client-side rendering
+  useEffect(() => {
+    setIsClient(true)
+    setScreenWidth(window.innerWidth)
+  }, [])
+
+  // Handle responsive layout
+  useEffect(() => {
+    if (!isClient) return
+
+    const handleResize = () => {
+      const newWidth = window.innerWidth
+      if (Math.abs(newWidth - screenWidth) > 100) {
+        setScreenWidth(newWidth)
+        // Recalculate layout for new screen size
+        const responsiveLayout = calculateResponsiveLayout(layout, newWidth)
+        onLayoutChange(responsiveLayout)
+      }
+    }
+
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [layout, screenWidth, onLayoutChange, isClient])
+
+  // Filter visible widgets
+  const visibleWidgets = layout.filter((widget) => widget.visible)
+
+  if (!isClient) {
+    // Server-side render placeholder
+    return (
+      <div className="dashboard-grid">
+        {visibleWidgets.map((widget) => (
+          <div
+            key={widget.id}
+            className="widget-skeleton"
+            style={{
+              gridColumn: `span ${widget.size.width}`,
+              gridRow: `span ${widget.size.height}`,
+            }}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div ref={gridRef} className="dashboard-grid animate-fade-in">
+      {visibleWidgets.map((widget) => (
+        <WidgetContainer
+          key={widget.id}
+          widget={widget}
+          onRemove={() => {
+            // Hide widget instead of removing
+            const updatedLayout = layout.map((w) =>
+              w.id === widget.id ? { ...w, visible: false } : w
+            )
+            onLayoutChange(updatedLayout)
+          }}
+          onResize={(newSize) => {
+            // Update widget size
+            const updatedLayout = layout.map((w) =>
+              w.id === widget.id ? { ...w, size: newSize } : w
+            )
+            onLayoutChange(updatedLayout)
+          }}
+          onSettings={() => {
+            // Open widget settings (to be implemented)
+            console.log("Widget settings:", widget.id)
+          }}
+        />
+      ))}
+
+      {/* Grid overlay for debugging (only in development) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="absolute inset-0 pointer-events-none opacity-10">
+          <div className="dashboard-grid h-full">
+            {Array.from({ length: 48 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: Grid cells are static
+              <div key={i} className="border border-dashed border-gray-400 dark:border-gray-600" />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

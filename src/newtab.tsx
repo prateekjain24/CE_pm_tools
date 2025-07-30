@@ -1,78 +1,50 @@
 import "~/styles/globals.css"
-import { Badge, Button, Card } from "~/components/common"
+import { DashboardGrid } from "~/components/dashboard/DashboardGrid"
+import { EmptyState } from "~/components/dashboard/EmptyState"
+import { DashboardHeader } from "~/components/layout/DashboardHeader"
+import { useDashboardLayout } from "~/hooks/useDashboardLayout"
+import type { WidgetConfig } from "~/types"
 
 export default function NewTab() {
+  const { layout, updateWidget } = useDashboardLayout()
+
+  const handleLayoutChange = (newLayout: WidgetConfig[]) => {
+    // For now, we'll update widgets individually
+    // This will be improved when we implement drag-and-drop
+    newLayout.forEach((widget) => {
+      const existing = layout.find((w) => w.id === widget.id)
+      if (existing && JSON.stringify(existing) !== JSON.stringify(widget)) {
+        updateWidget(widget.id, widget)
+      }
+    })
+  }
+
   return (
-    <div className="dashboard">
-      <div className="container">
-        <header className="py-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">PM Dashboard</h1>
-            <p className="text-lg text-gray-600">
-              Your personal command center for product management
-            </p>
-          </div>
-          <Button variant="ghost" size="sm">
-            Settings
-          </Button>
-        </header>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Subtle background pattern */}
+      <div
+        className="fixed inset-0 opacity-50"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239CA3AF' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }}
+      />
 
-        <main>
-          <div className="widget-grid mb-8">
-            {/* RICE Calculator Widget */}
-            <Card
-              title="RICE Calculator"
-              description="Calculate feature priority scores"
-              hoverable
-              footer={
-                <div className="flex justify-between items-center">
-                  <Badge variant="primary" size="sm">
-                    5 saved
-                  </Badge>
-                  <Button size="sm">Open</Button>
-                </div>
-              }
-            >
-              <p className="text-sm text-gray-500">
-                Prioritize features using Reach, Impact, Confidence, and Effort
-              </p>
-            </Card>
+      <div className="relative z-10">
+        <DashboardHeader />
 
-            {/* Product Hunt Feed Widget */}
-            <Card
-              title="Product Hunt"
-              description="Latest products and trends"
-              hoverable
-              footer={
-                <div className="flex justify-between items-center">
-                  <Badge variant="success" size="sm">
-                    Live
-                  </Badge>
-                  <Button size="sm">View All</Button>
-                </div>
-              }
-            >
-              <p className="text-sm text-gray-500">Discover new products and innovations daily</p>
-            </Card>
-
-            {/* Hacker News Feed Widget */}
-            <Card
-              title="Hacker News"
-              description="Tech news and discussions"
-              hoverable
-              footer={
-                <div className="flex justify-between items-center">
-                  <Badge variant="info" size="sm">
-                    30 new
-                  </Badge>
-                  <Button size="sm">Read More</Button>
-                </div>
-              }
-            >
-              <p className="text-sm text-gray-500">Stay updated with the latest in technology</p>
-            </Card>
-          </div>
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          {layout && layout.length > 0 ? (
+            <DashboardGrid layout={layout} onLayoutChange={handleLayoutChange} />
+          ) : (
+            <EmptyState />
+          )}
         </main>
+      </div>
+
+      {/* Gradient overlay for depth */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/50 to-transparent dark:from-black/20" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white/50 to-transparent dark:from-black/20" />
       </div>
     </div>
   )
