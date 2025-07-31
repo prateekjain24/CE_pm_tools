@@ -22,17 +22,116 @@ export interface RiceScore {
 }
 
 /**
+ * Supported currencies for market calculations
+ */
+export type Currency = "USD" | "EUR" | "GBP" | "JPY" | "INR"
+
+/**
  * TAM/SAM/SOM Market Sizing Calculator
  */
-export interface MarketSize {
+export interface TamCalculation {
   id: string
   name: string
+  description?: string
+  method: "topDown" | "bottomUp"
+  currency: Currency
+
+  // Market values
   tam: number // Total Addressable Market
   sam: number // Serviceable Addressable Market
   som: number // Serviceable Obtainable Market
-  currency: string // USD, EUR, etc.
+
+  // Percentages (for top-down)
+  samPercentage?: number // SAM as % of TAM
+  somPercentage?: number // SOM as % of SAM
+
+  // Bottom-up specific
+  segments?: MarketSegment[]
+
+  // Parameters
+  params?: MarketCalculationParams
+
+  // Metadata
   savedAt: Date
-  assumptions?: string
+  assumptions?: string[]
+  confidence?: number // 0-100
+  notes?: string
+}
+
+/**
+ * Market segment for bottom-up calculations
+ */
+export interface MarketSegment {
+  id?: string
+  name: string
+  users: number
+  avgPrice: number
+  growthRate: number // Annual growth %
+  penetrationRate: number // % of segment addressable
+}
+
+/**
+ * Market calculation parameters
+ */
+export interface MarketCalculationParams {
+  currency: Currency
+  timePeriod: "monthly" | "quarterly" | "annual"
+  geographicScope: "global" | "regional" | "country"
+  marketMaturity: "emerging" | "growing" | "mature" | "declining"
+  competitorCount?: number
+  marketShareTarget?: number // Target market share %
+}
+
+/**
+ * Market sizes with metadata
+ */
+export interface MarketSizes {
+  tam: number
+  sam: number
+  som: number
+  method: "topDown" | "bottomUp"
+  segments?: MarketSegment[]
+  assumptions: string[]
+  confidence: number // 0-100
+}
+
+/**
+ * Growth scenario for projections
+ */
+export interface GrowthScenario {
+  id: string
+  name: string
+  description: string
+  tamGrowthRate: number
+  samGrowthRate: number
+  somGrowthRate: number
+  confidence: number
+  assumptions: string[]
+}
+
+/**
+ * Scenario for comparison mode
+ */
+export interface MarketScenario {
+  id: string
+  name: string
+  description: string
+  method: "topDown" | "bottomUp"
+  values: MarketSizes
+  params: MarketCalculationParams
+  assumptions: string[]
+  confidence: number
+  lastModified: Date
+}
+
+/**
+ * Industry benchmark for percentages
+ */
+export interface IndustryBenchmark {
+  label: string
+  value: number
+  description: string
+  industries: string[]
 }
 
 /**

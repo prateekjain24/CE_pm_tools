@@ -334,3 +334,4 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
 - Always validate layout changes to prevent widget collisions
 - Error boundaries are critical for widget isolation
 - URL parameters enable deep linking to specific features
+- Do not mention claude code in commit message
