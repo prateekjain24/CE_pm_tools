@@ -1,5 +1,6 @@
 import { motion } from "framer-motion"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
+import { createSafeAnimationProps, SafeMotionDiv } from "~/lib/animation/safeMotion"
 import { getRiceScoreCategory } from "~/lib/calculators/rice"
 
 interface RiceScoreDisplayProps {
@@ -31,26 +32,13 @@ export function RiceScoreDisplay({ score, breakdown, animated = true }: RiceScor
     { name: "Remaining", value: Math.max(0, 200 - score), fill: "#e5e7eb" },
   ]
 
-  const scoreMotion = animated
-    ? {
-        initial: { scale: 0, opacity: 0 },
-        animate: { scale: 1, opacity: 1 },
-        transition: { duration: 0.5, delay: 0.2 },
-      }
-    : {}
-
-  const categoryMotion = animated
-    ? {
-        initial: { y: 20, opacity: 0 },
-        animate: { y: 0, opacity: 1 },
-        transition: { duration: 0.5, delay: 0.4 },
-      }
-    : {}
+  const scoreMotion = createSafeAnimationProps(animated, "scaleIn")
+  const categoryMotion = createSafeAnimationProps(animated, "slideIn")
 
   return (
     <div className="rice-score-display space-y-4">
       {/* Gauge Chart */}
-      <motion.div className="relative h-48" {...scoreMotion}>
+      <SafeMotionDiv className="relative h-48" {...scoreMotion}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -97,10 +85,10 @@ export function RiceScoreDisplay({ score, breakdown, animated = true }: RiceScor
             RICE Score
           </motion.div>
         </div>
-      </motion.div>
+      </SafeMotionDiv>
 
       {/* Category Badge */}
-      <motion.div className="text-center" {...categoryMotion}>
+      <SafeMotionDiv className="text-center" {...categoryMotion}>
         <div
           className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold"
           style={{
@@ -142,15 +130,13 @@ export function RiceScoreDisplay({ score, breakdown, animated = true }: RiceScor
           {category.label}
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">{category.description}</p>
-      </motion.div>
+      </SafeMotionDiv>
 
       {/* Score Breakdown */}
       {breakdown && (
-        <motion.div
+        <SafeMotionDiv
           className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200 dark:border-gray-700"
-          initial={animated ? { opacity: 0 } : {}}
-          animate={animated ? { opacity: 1 } : {}}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          {...createSafeAnimationProps(animated, "fadeIn")}
         >
           <div className="text-center">
             <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
@@ -176,7 +162,7 @@ export function RiceScoreDisplay({ score, breakdown, animated = true }: RiceScor
             </div>
             <div className="text-xs text-gray-600 dark:text-gray-400">Effort</div>
           </div>
-        </motion.div>
+        </SafeMotionDiv>
       )}
     </div>
   )

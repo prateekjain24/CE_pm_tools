@@ -1,4 +1,3 @@
-import { motion } from "framer-motion"
 import {
   Bar,
   BarChart,
@@ -9,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import { createSafeAnimationProps, SafeMotionDiv } from "~/lib/animation/safeMotion"
 import { calculateComponentContributions } from "~/lib/calculators/rice"
 
 interface RiceBreakdownChartProps {
@@ -82,16 +82,10 @@ export function RiceBreakdownChart({
     return null
   }
 
-  const chartMotion = animated
-    ? {
-        initial: { opacity: 0, y: 20 },
-        animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.5 },
-      }
-    : {}
+  const chartMotion = createSafeAnimationProps(animated, "slideIn")
 
   return (
-    <motion.div className="rice-breakdown-chart space-y-4" {...chartMotion}>
+    <SafeMotionDiv className="rice-breakdown-chart space-y-4" {...chartMotion}>
       <div>
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
           Component Breakdown
@@ -139,12 +133,16 @@ export function RiceBreakdownChart({
           {data
             .filter((d) => d.normalized >= 0 && d.name !== "Effort")
             .map((item) => (
-              <motion.div
+              <SafeMotionDiv
                 key={item.name}
                 className="flex items-center justify-between text-sm"
-                initial={animated ? { x: -20, opacity: 0 } : {}}
-                animate={animated ? { x: 0, opacity: 1 } : {}}
-                transition={{ duration: 0.3, delay: 0.1 }}
+                {...(animated
+                  ? {
+                      initial: { x: -20, opacity: 0 },
+                      animate: { x: 0, opacity: 1 },
+                      transition: { duration: 0.3, delay: 0.1 },
+                    }
+                  : {})}
               >
                 <span className="flex items-center">
                   <div
@@ -156,7 +154,7 @@ export function RiceBreakdownChart({
                 <span className="font-medium" style={{ color: item.color }}>
                   +{item.normalized}%
                 </span>
-              </motion.div>
+              </SafeMotionDiv>
             ))}
         </div>
 
@@ -167,12 +165,16 @@ export function RiceBreakdownChart({
           {data
             .filter((d) => d.name === "Effort" && d.normalized < 0)
             .map((item) => (
-              <motion.div
+              <SafeMotionDiv
                 key={item.name}
                 className="flex items-center justify-between text-sm"
-                initial={animated ? { x: 20, opacity: 0 } : {}}
-                animate={animated ? { x: 0, opacity: 1 } : {}}
-                transition={{ duration: 0.3, delay: 0.1 }}
+                {...(animated
+                  ? {
+                      initial: { x: 20, opacity: 0 },
+                      animate: { x: 0, opacity: 1 },
+                      transition: { duration: 0.3, delay: 0.1 },
+                    }
+                  : {})}
               >
                 <span className="flex items-center">
                   <div
@@ -184,7 +186,7 @@ export function RiceBreakdownChart({
                 <span className="font-medium" style={{ color: item.color }}>
                   {item.normalized}%
                 </span>
-              </motion.div>
+              </SafeMotionDiv>
             ))}
           {effort <= 1 && (
             <div className="text-xs text-gray-500 dark:text-gray-400 italic">
@@ -193,6 +195,6 @@ export function RiceBreakdownChart({
           )}
         </div>
       </div>
-    </motion.div>
+    </SafeMotionDiv>
   )
 }

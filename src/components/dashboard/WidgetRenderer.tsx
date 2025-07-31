@@ -54,6 +54,13 @@ export function WidgetRenderer({ widget, onRemove, onSettings, onHide }: WidgetR
           <WidgetSkeleton
             title={widget.title || widgetDefinition.name}
             lines={widgetDefinition.category === "feed" ? 4 : 3}
+            variant={
+              widgetDefinition.category === "calculator"
+                ? "calculator"
+                : widgetDefinition.category === "feed"
+                  ? "feed"
+                  : "default"
+            }
           />
         }
       >

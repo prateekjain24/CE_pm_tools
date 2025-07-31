@@ -84,13 +84,14 @@ export default function ProductHuntFeed({ widgetId, widgetConfig }: ProductHuntF
       onSettings={widgetConfig?.onSettings as () => void}
       onHide={widgetConfig?.onHide as () => void}
       settings={widgetConfig}
+      emptyStateType="feed"
     >
       {(products) => (
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-4">
           {products.map((product) => (
             <div
               key={product.id}
-              className="pb-3 border-b border-gray-100 dark:border-gray-700/50 last:border-0 last:pb-0"
+              className="pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0"
             >
               {/* Product Header */}
               <div className="flex items-start justify-between mb-1">

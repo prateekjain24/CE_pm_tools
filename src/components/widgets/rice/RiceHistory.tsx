@@ -1,8 +1,9 @@
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { useMemo, useState } from "react"
 import { Button } from "~/components/common/Button"
 import { Input } from "~/components/common/Input"
 import { Modal } from "~/components/common/Modal"
+import { SafeMotionDiv } from "~/lib/animation/safeMotion"
 import { getRiceScoreCategory } from "~/lib/calculators/rice"
 import { exportRiceToCSV, exportRiceToJSON, exportRiceToPDF } from "~/lib/export/riceExport"
 import type { RiceScore } from "~/types"
@@ -198,7 +199,7 @@ export function RiceHistory({
                   const isSelected = selectedItems.has(calc.id)
 
                   return (
-                    <motion.div
+                    <SafeMotionDiv
                       key={calc.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -303,7 +304,7 @@ export function RiceHistory({
                           </div>
                         </div>
                       </div>
-                    </motion.div>
+                    </SafeMotionDiv>
                   )
                 })}
               </AnimatePresence>

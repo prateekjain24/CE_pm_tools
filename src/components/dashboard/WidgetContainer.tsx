@@ -17,7 +17,7 @@ export function WidgetContainer({ widget, onRemove, onSettings, onHide }: Widget
 
   return (
     <div
-      className="widget-container group animate-scale-in"
+      className="widget-container relative group animate-scale-in"
       style={gridStyles}
       data-widget-id={widget.id}
     >

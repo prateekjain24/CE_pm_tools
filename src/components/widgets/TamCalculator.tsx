@@ -10,16 +10,13 @@ export default function TamCalculator({ widgetId, widgetConfig }: TamCalculatorP
     <BaseWidget
       widgetId={widgetId}
       title="TAM/SAM/SOM Calculator"
-      data={{}}
+      data={null}
       settings={widgetConfig}
+      emptyStateType="calculator"
+      onSettings={widgetConfig?.onSettings as () => void}
+      onHide={widgetConfig?.onHide as () => void}
     >
-      {() => (
-        <div className="p-4 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            TAM/SAM/SOM Calculator coming soon
-          </p>
-        </div>
-      )}
+      {() => <></>}
     </BaseWidget>
   )
 }
