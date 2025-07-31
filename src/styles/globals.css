@@ -27,7 +27,7 @@
 @layer components {
   /* Extension Specific Component Styles */
   .popup-container {
-    @apply w-80 min-h-[200px] p-4 bg-white;
+    @apply w-[400px] h-[600px] bg-white dark:bg-gray-900 overflow-hidden flex flex-col;
   }
 
   .options-container {
