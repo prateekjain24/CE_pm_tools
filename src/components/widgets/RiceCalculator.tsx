@@ -35,7 +35,8 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
       title="RICE Score Calculator"
       data={currentScore}
       settings={widgetConfig}
-      onSettings={() => console.log("Settings clicked")}
+      onSettings={widgetConfig?.onSettings as () => void}
+      onHide={widgetConfig?.onHide as () => void}
     >
       {(data) => (
         <div className="p-4 space-y-4">

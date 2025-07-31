@@ -8,13 +8,14 @@ interface WidgetRendererProps {
   widget: WidgetConfig
   onRemove: () => void
   onSettings: () => void
+  onHide: () => void
 }
 
 /**
  * Dynamically renders widgets based on their type
  * Handles lazy loading, error boundaries, and suspense
  */
-export function WidgetRenderer({ widget, onRemove, onSettings }: WidgetRendererProps) {
+export function WidgetRenderer({ widget, onRemove, onSettings, onHide }: WidgetRendererProps) {
   // Get widget definition from registry
   const widgetDefinition = widgetRegistry.get(widget.type)
 
@@ -63,6 +64,7 @@ export function WidgetRenderer({ widget, onRemove, onSettings }: WidgetRendererP
             customTitle: widget.title,
             onRemove,
             onSettings,
+            onHide,
           }}
         />
       </Suspense>

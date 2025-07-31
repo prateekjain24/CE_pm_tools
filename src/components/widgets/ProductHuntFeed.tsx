@@ -81,7 +81,8 @@ export default function ProductHuntFeed({ widgetId, widgetConfig }: ProductHuntF
       loading={loading || isRefreshing}
       error={error}
       onRefresh={handleRefresh}
-      onSettings={() => console.log("Settings clicked")}
+      onSettings={widgetConfig?.onSettings as () => void}
+      onHide={widgetConfig?.onHide as () => void}
       settings={widgetConfig}
     >
       {(products) => (

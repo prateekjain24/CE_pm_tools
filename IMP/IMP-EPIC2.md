@@ -277,25 +277,37 @@ Successfully created a comprehensive widget framework with:
 
 ---
 
-## Story 2.3: Dashboard State Management
+## Story 2.3: Dashboard State Management ✅
 **Description:** Implement state persistence and management for dashboard layout and widget data using Plasmo's storage API.
 
+**Status:** COMPLETED (2025-07-31)
+
 **Acceptance Criteria:**
-- Layout changes persist across sessions
-- Widget visibility can be toggled
-- State syncs across extension contexts
-- Performance optimized for frequent updates
+- ✅ Layout changes persist across sessions
+- ✅ Widget visibility can be toggled
+- ✅ State syncs across extension contexts
+- ✅ Performance optimized for frequent updates
+
+### Implementation Summary:
+Successfully implemented comprehensive state management with:
+- Widget visibility toggles in header with hide/show functionality
+- Hidden widgets drawer for managing non-visible widgets
+- Storage migration system with versioning
+- Layout validation with error handling
+- Storage quota management and monitoring
+- Backup/restore functionality for layouts
 
 ### Tickets:
 
-#### Ticket 2.3.1: Setup Storage Hooks for Layout
+#### Ticket 2.3.1: Setup Storage Hooks for Layout ✅
 - **Description:** Implement useStorage hooks for dashboard layout persistence
 - **Story Points:** 1 SP
+- **Status:** COMPLETED (previously in Story 2.1)
 - **Technical Requirements:**
-  - Create custom hook for layout management
-  - Handle default layout initialization
-  - Sync layout across all tabs
-  - Debounce frequent updates
+  - ✅ Create custom hook for layout management
+  - ✅ Handle default layout initialization
+  - ✅ Sync layout across all tabs
+  - ✅ Debounce frequent updates
 - **Dependencies:** 2.1.3
 - **Implementation Notes:**
   ```typescript
@@ -321,15 +333,31 @@ Successfully created a comprehensive widget framework with:
   }
   ```
 
-#### Ticket 2.3.2: Implement Widget Visibility Toggles
+#### Ticket 2.3.2: Implement Widget Visibility Toggles ✅
 - **Description:** Add functionality to show/hide widgets without removing them from layout
 - **Story Points:** 1 SP
+- **Status:** COMPLETED
 - **Technical Requirements:**
-  - Add visibility property to widget config
-  - Create toggle UI in widget header
-  - Update grid to skip hidden widgets
-  - Add "show hidden widgets" mode
+  - ✅ Add visibility property to widget config
+  - ✅ Create toggle UI in widget header
+  - ✅ Update grid to skip hidden widgets
+  - ✅ Add "show hidden widgets" mode
 - **Dependencies:** 2.3.1
+- **Implementation Details:**
+  - Added hide button to WidgetHeader component
+  - Created HiddenWidgetsDrawer for managing hidden widgets
+  - Updated DashboardHeader with hidden widget count badge
+  - Modified WidgetContainer to support separate hide/remove actions
+
+**Files Created/Modified:**
+- `src/components/widgets/WidgetHeader.tsx` - Added onHide prop and button
+- `src/components/widgets/BaseWidget.tsx` - Added onHide support
+- `src/components/dashboard/HiddenWidgetsDrawer.tsx` - New drawer component
+- `src/components/dashboard/WidgetRenderer.tsx` - Pass hide callback
+- `src/components/dashboard/WidgetContainer.tsx` - Added onHide prop
+- `src/components/dashboard/DashboardGrid.tsx` - Separate hide/remove logic
+- `src/components/layout/DashboardHeader.tsx` - Added hidden widgets button
+- `src/newtab.tsx` - Integrated HiddenWidgetsDrawer
 - **Implementation Notes:**
   ```typescript
   const toggleWidgetVisibility = (widgetId: string) => {
@@ -339,15 +367,28 @@ Successfully created a comprehensive widget framework with:
   }
   ```
 
-#### Ticket 2.3.3: Add Layout Persistence Layer
+#### Ticket 2.3.3: Add Layout Persistence Layer ✅
 - **Description:** Ensure layout changes are properly saved to chrome.storage.local
 - **Story Points:** 1 SP
+- **Status:** COMPLETED
 - **Technical Requirements:**
-  - Implement storage migration for version updates
-  - Add layout validation before saving
-  - Handle storage quota limits
-  - Create backup/restore functionality
+  - ✅ Implement storage migration for version updates
+  - ✅ Add layout validation before saving
+  - ✅ Handle storage quota limits
+  - ✅ Create backup/restore functionality
 - **Dependencies:** 2.3.2
+- **Implementation Details:**
+  - Created comprehensive migration system with version tracking
+  - Built layout validator with collision detection and sanitization
+  - Implemented storage quota monitoring and cleanup utilities
+  - Added backup/restore UI for layout management
+
+**Files Created:**
+- `src/lib/storage/migrations.ts` - Migration framework with versioning
+- `src/lib/storage/layoutValidator.ts` - Layout validation and sanitization
+- `src/lib/storage/storageManager.ts` - Quota management and monitoring
+- `src/components/settings/BackupRestore.tsx` - Import/export UI
+- Updated `src/hooks/useDashboardLayout.ts` - Integrated validation and migration
 - **Implementation Notes:**
   ```typescript
   // src/lib/storage/layoutPersistence.ts

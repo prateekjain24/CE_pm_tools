@@ -1,12 +1,15 @@
 import "~/styles/globals.css"
+import { useState } from "react"
 import { DashboardGrid } from "~/components/dashboard/DashboardGrid"
 import { EmptyState } from "~/components/dashboard/EmptyState"
+import { HiddenWidgetsDrawer } from "~/components/dashboard/HiddenWidgetsDrawer"
 import { DashboardHeader } from "~/components/layout/DashboardHeader"
 import { useDashboardLayout } from "~/hooks/useDashboardLayout"
 import type { WidgetConfig } from "~/types"
 
 export default function NewTab() {
-  const { layout, updateWidget } = useDashboardLayout()
+  const { layout, updateWidget, showWidget } = useDashboardLayout()
+  const [showHiddenDrawer, setShowHiddenDrawer] = useState(false)
 
   const handleLayoutChange = (newLayout: WidgetConfig[]) => {
     // For now, we'll update widgets individually
@@ -19,6 +22,14 @@ export default function NewTab() {
     })
   }
 
+  const handleRestoreWidget = (widgetId: string) => {
+    showWidget(widgetId)
+    setShowHiddenDrawer(false)
+  }
+
+  // Count hidden widgets
+  const hiddenWidgetCount = layout.filter((w) => !w.visible).length
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Subtle background pattern */}
@@ -30,7 +41,10 @@ export default function NewTab() {
       />
 
       <div className="relative z-10">
-        <DashboardHeader />
+        <DashboardHeader
+          onShowHiddenWidgets={() => setShowHiddenDrawer(true)}
+          hiddenWidgetCount={hiddenWidgetCount}
+        />
 
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           {layout && layout.length > 0 ? (
@@ -40,6 +54,14 @@ export default function NewTab() {
           )}
         </main>
       </div>
+
+      {/* Hidden Widgets Drawer */}
+      <HiddenWidgetsDrawer
+        layout={layout}
+        onRestore={handleRestoreWidget}
+        onClose={() => setShowHiddenDrawer(false)}
+        open={showHiddenDrawer}
+      />
 
       {/* Gradient overlay for depth */}
       <div className="fixed inset-0 pointer-events-none">

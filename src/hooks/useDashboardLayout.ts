@@ -5,6 +5,14 @@ import {
   getDefaultLayout,
   hasCollision,
 } from "~/lib/dashboard/defaultLayout"
+import { validateLayout } from "~/lib/storage/layoutValidator"
+import {
+  extractWidgets,
+  migrateLayout,
+  prepareLayoutForStorage,
+  type VersionedLayout,
+} from "~/lib/storage/migrations"
+import { hasStorageSpace } from "~/lib/storage/storageManager"
 import type { Size, WidgetConfig } from "~/types"
 import { DEFAULT_WIDGET_SIZES } from "~/types"
 
@@ -25,10 +33,13 @@ interface UseDashboardLayoutReturn {
  * Custom hook for managing dashboard layout with persistence
  */
 export function useDashboardLayout(): UseDashboardLayoutReturn {
-  const [layout, setLayout, { isLoading }] = useStorage<WidgetConfig[]>(
+  const [rawLayout, setRawLayout, { isLoading }] = useStorage<VersionedLayout | WidgetConfig[]>(
     "dashboard-layout",
-    getDefaultLayout()
+    prepareLayoutForStorage(getDefaultLayout())
   )
+
+  // Extract widgets from versioned or legacy layout
+  const layout = extractWidgets(rawLayout)
 
   // Debounce timer for layout updates
   const updateTimerRef = useRef<NodeJS.Timeout>()
@@ -46,16 +57,34 @@ export function useDashboardLayout(): UseDashboardLayoutReturn {
    * Debounced layout update to prevent excessive storage writes
    */
   const debouncedSetLayout = useCallback(
-    (newLayout: WidgetConfig[]) => {
+    async (newLayout: WidgetConfig[]) => {
       if (updateTimerRef.current) {
         clearTimeout(updateTimerRef.current)
       }
 
-      updateTimerRef.current = setTimeout(() => {
-        setLayout(newLayout)
+      updateTimerRef.current = setTimeout(async () => {
+        // Validate layout before saving
+        const validation = validateLayout(newLayout)
+        if (!validation.valid) {
+          console.error("Layout validation failed:", validation.errors)
+          return
+        }
+
+        const sanitizedLayout = validation.sanitizedLayout || newLayout
+        const versionedLayout = prepareLayoutForStorage(sanitizedLayout)
+
+        // Check storage space
+        const { hasSpace, reason } = await hasStorageSpace("dashboard-layout", versionedLayout)
+        if (!hasSpace) {
+          console.error("Not enough storage space:", reason)
+          // TODO: Show user notification
+          return
+        }
+
+        setRawLayout(versionedLayout)
       }, 500) // 500ms debounce
     },
-    [setLayout]
+    [setRawLayout]
   )
 
   /**
@@ -170,8 +199,20 @@ export function useDashboardLayout(): UseDashboardLayoutReturn {
    * Reset layout to default
    */
   const resetLayout = useCallback(() => {
-    setLayout(getDefaultLayout())
-  }, [setLayout])
+    const defaultLayout = getDefaultLayout()
+    const versionedLayout = prepareLayoutForStorage(defaultLayout)
+    setRawLayout(versionedLayout)
+  }, [setRawLayout])
+
+  // Migrate layout on first load
+  useEffect(() => {
+    if (!isLoading && rawLayout) {
+      const migrated = migrateLayout(rawLayout)
+      if (migrated.version !== (rawLayout as any).version) {
+        setRawLayout(migrated)
+      }
+    }
+  }, [rawLayout, setRawLayout, isLoading])
 
   return {
     layout: layout || [],

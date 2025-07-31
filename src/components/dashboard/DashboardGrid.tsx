@@ -67,7 +67,12 @@ export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
           key={widget.id}
           widget={widget}
           onRemove={() => {
-            // Hide widget instead of removing
+            // Remove widget completely
+            const updatedLayout = layout.filter((w) => w.id !== widget.id)
+            onLayoutChange(updatedLayout)
+          }}
+          onHide={() => {
+            // Hide widget (keep in layout but not visible)
             const updatedLayout = layout.map((w) =>
               w.id === widget.id ? { ...w, visible: false } : w
             )

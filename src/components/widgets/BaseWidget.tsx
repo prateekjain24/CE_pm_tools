@@ -15,6 +15,7 @@ export interface BaseWidgetProps<T = unknown> {
   data?: T
   onRefresh?: () => Promise<void>
   onSettings?: () => void
+  onHide?: () => void
   children: (data: T) => ReactNode
   className?: string
   // Widget-specific settings
@@ -33,6 +34,7 @@ export function BaseWidget<T = unknown>({
   data,
   onRefresh,
   onSettings,
+  onHide,
   children,
   className = "",
   settings,
@@ -51,6 +53,7 @@ export function BaseWidget<T = unknown>({
           icon={icon}
           onRefresh={onRefresh}
           onSettings={onSettings}
+          onHide={onHide}
           loading={loading}
         />
         <WidgetError error={error} onRetry={onRefresh} />
@@ -67,6 +70,7 @@ export function BaseWidget<T = unknown>({
           icon={icon}
           onRefresh={onRefresh}
           onSettings={onSettings}
+          onHide={onHide}
           loading={loading}
         />
         <div className="widget-empty p-8 text-center">
@@ -93,6 +97,7 @@ export function BaseWidget<T = unknown>({
         icon={icon}
         onRefresh={onRefresh}
         onSettings={onSettings}
+        onHide={onHide}
         loading={loading}
       />
       <div className="widget-content">{children(data)}</div>

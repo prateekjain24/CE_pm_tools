@@ -6,9 +6,10 @@ interface WidgetContainerProps {
   onRemove: () => void
   onResize: (newSize: Size) => void
   onSettings: () => void
+  onHide: () => void
 }
 
-export function WidgetContainer({ widget, onRemove, onSettings }: WidgetContainerProps) {
+export function WidgetContainer({ widget, onRemove, onSettings, onHide }: WidgetContainerProps) {
   const gridStyles = {
     gridColumn: `span ${widget.size.width}`,
     gridRow: `span ${widget.size.height}`,
@@ -20,7 +21,7 @@ export function WidgetContainer({ widget, onRemove, onSettings }: WidgetContaine
       style={gridStyles}
       data-widget-id={widget.id}
     >
-      <WidgetRenderer widget={widget} onRemove={onRemove} onSettings={onSettings} />
+      <WidgetRenderer widget={widget} onRemove={onRemove} onSettings={onSettings} onHide={onHide} />
 
       {/* Drag Handle (will be functional with @dnd-kit) */}
       <div className="drag-handle">
