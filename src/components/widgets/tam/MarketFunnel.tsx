@@ -94,7 +94,12 @@ export function MarketFunnel({
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
           <div className="text-center py-8">
-            <svg className="w-full h-48 opacity-30" viewBox="0 0 400 240" aria-label="Market funnel placeholder">
+            <svg
+              className="w-full h-48 opacity-30"
+              viewBox="0 0 400 240"
+              aria-label="Market funnel placeholder"
+            >
+              <title>Market funnel placeholder</title>
               <rect x="50" y="0" width="300" height="60" fill="#3b82f6" rx="4" opacity="0.3" />
               <rect x="100" y="80" width="200" height="60" fill="#10b981" rx="4" opacity="0.3" />
               <rect x="150" y="160" width="100" height="60" fill="#8b5cf6" rx="4" opacity="0.3" />
@@ -167,15 +172,7 @@ export function MarketFunnel({
               const x = (400 - width) / 2
 
               return (
-                <g
-                  key={segment.id}
-                  onMouseEnter={() => setHoveredSegment(segment.id)}
-                  onMouseLeave={() => setHoveredSegment(null)}
-                  onClick={() => handleSegmentClick(segment)}
-                  className={interactive ? "cursor-pointer" : ""}
-                  role={interactive ? "button" : undefined}
-                  tabIndex={interactive ? 0 : undefined}
-                >
+                <g key={segment.id}>
                   <rect
                     x={x}
                     y={y}
@@ -186,6 +183,11 @@ export function MarketFunnel({
                     stroke={selectedSegment === segment.id ? "#1f2937" : "none"}
                     strokeWidth={selectedSegment === segment.id ? 2 : 0}
                     rx={4}
+                    onMouseEnter={interactive ? () => setHoveredSegment(segment.id) : undefined}
+                    onMouseLeave={interactive ? () => setHoveredSegment(null) : undefined}
+                    onClick={interactive ? () => handleSegmentClick(segment) : undefined}
+                    className={interactive ? "cursor-pointer" : ""}
+                    aria-label={interactive ? segment.fullName : undefined}
                     style={{
                       transform: hoveredSegment === segment.id ? "scale(1.02)" : "scale(1)",
                       transformOrigin: "center",

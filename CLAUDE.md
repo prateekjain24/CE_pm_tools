@@ -340,3 +340,4 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
 - URL parameters enable deep linking to specific features
 - Do not mention claude code in commit message
 - Never add claude code or claude in co authored
+- While commiting do not add co-authored by
