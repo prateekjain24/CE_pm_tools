@@ -9,6 +9,7 @@ interface MarketFunnelProps {
   showGrowth?: boolean
   visualMode?: "funnel" | "pie" | "bar"
   onSegmentClick?: (segment: "tam" | "sam" | "som") => void
+  showPlaceholder?: boolean
 }
 
 interface SegmentData {
@@ -27,6 +28,7 @@ export function MarketFunnel({
   interactive = true,
   visualMode = "funnel",
   onSegmentClick,
+  showPlaceholder = false,
 }: MarketFunnelProps) {
   const { tam, sam, som } = values
   const funnelRef = useRef<HTMLDivElement>(null)
@@ -77,8 +79,42 @@ export function MarketFunnel({
     console.log(`Exporting as ${format}`)
   }
 
-  if (tam === 0 && sam === 0 && som === 0) {
+  if (tam === 0 && sam === 0 && som === 0 && !showPlaceholder) {
     return null
+  }
+
+  // Show placeholder funnel when no data
+  if (showPlaceholder) {
+    return (
+      <div className="market-funnel space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Market Size Visualization
+          </h3>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+          <div className="text-center py-8">
+            <svg className="w-full h-48 opacity-30" viewBox="0 0 400 240" aria-label="Market funnel placeholder">
+              <rect x="50" y="0" width="300" height="60" fill="#3b82f6" rx="4" opacity="0.3" />
+              <rect x="100" y="80" width="200" height="60" fill="#10b981" rx="4" opacity="0.3" />
+              <rect x="150" y="160" width="100" height="60" fill="#8b5cf6" rx="4" opacity="0.3" />
+              <text x="200" y="30" textAnchor="middle" className="fill-gray-500 text-sm">
+                TAM
+              </text>
+              <text x="200" y="110" textAnchor="middle" className="fill-gray-500 text-sm">
+                SAM
+              </text>
+              <text x="200" y="190" textAnchor="middle" className="fill-gray-500 text-sm">
+                SOM
+              </text>
+            </svg>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+              Enter TAM value to see your market funnel visualization
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -137,6 +173,8 @@ export function MarketFunnel({
                   onMouseLeave={() => setHoveredSegment(null)}
                   onClick={() => handleSegmentClick(segment)}
                   className={interactive ? "cursor-pointer" : ""}
+                  role={interactive ? "button" : undefined}
+                  tabIndex={interactive ? 0 : undefined}
                 >
                   <rect
                     x={x}

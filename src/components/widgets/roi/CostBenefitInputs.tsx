@@ -174,8 +174,13 @@ function LineItemList({
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        No {type} added yet. Click the button below to add your first item.
+      <div className="text-center py-8">
+        <div className="text-gray-500 dark:text-gray-400">No {type} added yet</div>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
+          {type === "costs"
+            ? "Add your project costs like development, infrastructure, or licensing"
+            : "Add expected benefits like revenue increases or cost savings"}
+        </p>
       </div>
     )
   }

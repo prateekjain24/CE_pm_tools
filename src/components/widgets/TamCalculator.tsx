@@ -306,11 +306,14 @@ export default function TamCalculator({ widgetId, widgetConfig }: TamCalculatorP
           </Tabs>
 
           {/* Market Funnel Visualization */}
-          {(data.tam > 0 || data.sam > 0 || data.som > 0) && (
-            <Suspense fallback={<WidgetSkeleton title="Loading visualization..." />}>
-              <MarketFunnel values={data} currency={currency} interactive={true} />
-            </Suspense>
-          )}
+          <Suspense fallback={<WidgetSkeleton title="Loading visualization..." />}>
+            <MarketFunnel
+              values={data}
+              currency={currency}
+              interactive={true}
+              showPlaceholder={data.tam === 0}
+            />
+          </Suspense>
 
           {/* Action Buttons */}
           <div className="flex gap-2">

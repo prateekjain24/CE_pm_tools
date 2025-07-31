@@ -4,7 +4,7 @@ import { Button } from "~/components/common/Button"
 import { Input } from "~/components/common/Input"
 import { Select } from "~/components/common/Select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/common/Tabs"
-import { getFieldError, useRoiValidation } from "~/hooks/useRoiValidation"
+import { useRoiValidation } from "~/hooks/useRoiValidation"
 import { calculateRoiMetrics } from "~/lib/calculators/roi"
 import { exportRoiToPDF } from "~/lib/export/roiExport"
 import type { Currency, LineItem, RoiCalculation, TimePeriod } from "~/types"
@@ -182,19 +182,23 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
             </div>
           )}
 
-          {/* Suggestions */}
-          {validation.suggestions.length > 0 && validation.errors.length === 0 && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                Suggestions:
-              </h4>
-              <ul className="list-disc list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                {validation.suggestions.map((suggestion) => (
-                  <li key={suggestion}>{suggestion}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Suggestions - Only show when there's no data */}
+          {validation.suggestions.length > 0 &&
+            validation.errors.length === 0 &&
+            costs.length === 0 &&
+            benefits.length === 0 &&
+            initialCost === 0 && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Getting Started:
+                </h4>
+                <ul className="list-disc list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  {validation.suggestions.map((suggestion) => (
+                    <li key={suggestion}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
           {/* Project Information */}
           <div className="space-y-4">
