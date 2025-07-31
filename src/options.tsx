@@ -1,147 +1,195 @@
+import { useStorage } from "@plasmohq/storage/hook"
 import { useEffect, useState } from "react"
 
 import "~/styles/globals.css"
-import { Badge, Button, Card, Input, Select, Switch } from "~/components/common"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/common"
+import { ApiKeyManager } from "~/components/settings/ApiKeyManager"
+import { DataSettings } from "~/components/settings/DataSettings"
+import { GeneralSettings } from "~/components/settings/GeneralSettings"
+import { WidgetPreferences } from "~/components/settings/WidgetPreferences"
 import type { UserSettings } from "~/types"
 import { DEFAULT_USER_SETTINGS } from "~/types"
 
 export default function Options() {
-  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS)
+  const [settings, setSettings] = useStorage<UserSettings>("userSettings", DEFAULT_USER_SETTINGS)
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.slice(1)
+    return hash || "general"
+  })
   const [saved, setSaved] = useState(false)
 
-  // Load settings on mount
+  // Update URL hash when tab changes
   useEffect(() => {
-    chrome.storage.sync.get(["userSettings"], (result) => {
-      if (result.userSettings) {
-        setSettings(result.userSettings)
+    window.location.hash = activeTab
+  }, [activeTab])
+
+  // Listen for hash changes (e.g., from back/forward navigation)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1)
+      if (hash) {
+        setActiveTab(hash)
       }
-    })
+    }
+
+    window.addEventListener("hashchange", handleHashChange)
+    return () => window.removeEventListener("hashchange", handleHashChange)
   }, [])
 
-  const handleSave = () => {
-    chrome.storage.sync.set({ userSettings: settings }, () => {
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    })
+  const handleSave = async () => {
+    // Settings are automatically saved by useStorage hook
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
-  const handleChange = (field: keyof UserSettings, value: string | number | boolean) => {
+  const handleSettingChange = (field: keyof UserSettings, value: any) => {
     setSettings((prev) => ({ ...prev, [field]: value }))
   }
 
-  const themeOptions = [
-    { value: "light", label: "Light" },
-    { value: "dark", label: "Dark (Coming Soon)", disabled: true },
-  ]
-
   return (
-    <div className="options-container">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header */}
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">PM Dashboard Settings</h1>
-          <p className="text-lg text-gray-600">
-            Configure your dashboard preferences and API integrations
-          </p>
-        </header>
-
-        {/* General Settings */}
-        <Card
-          title="General Settings"
-          description="Configure basic dashboard behavior"
-          className="mb-6"
-        >
-          <div className="space-y-4">
-            <Input
-              label="Feed Refresh Interval (minutes)"
-              type="number"
-              value={settings.refreshInterval}
-              onChange={(e) => handleChange("refreshInterval", parseInt(e.target.value))}
-              min="5"
-              max="60"
-              helperText="How often to check for new feed items"
-              className="w-32"
-            />
-
-            <Select
-              label="Theme"
-              value={settings.theme}
-              onChange={(e) => handleChange("theme", e.target.value as "light" | "dark")}
-              options={themeOptions}
-              className="w-48"
-            />
-          </div>
-        </Card>
-
-        {/* Feed Settings */}
-        <Card
-          title="Feed Settings"
-          description="Enable or disable different data sources"
-          className="mb-6"
-        >
-          <div className="space-y-3">
-            <Switch
-              label="Product Hunt Feed"
-              description="Show latest products and launches"
-              checked={settings.productHuntEnabled}
-              onChange={(e) => handleChange("productHuntEnabled", e.target.checked)}
-            />
-
-            <Switch
-              label="Hacker News Feed"
-              description="Display top tech news and discussions"
-              checked={settings.hackerNewsEnabled}
-              onChange={(e) => handleChange("hackerNewsEnabled", e.target.checked)}
-            />
-
-            <Switch
-              label="Jira Integration"
-              description="Connect to your Jira instance for ticket tracking"
-              checked={settings.jiraEnabled}
-              onChange={(e) => handleChange("jiraEnabled", e.target.checked)}
-            />
-          </div>
-        </Card>
-
-        {/* API Keys Section */}
-        <Card
-          title="API Keys"
-          description="Manage third-party service integrations"
-          className="mb-6"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">API Configuration</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  Add your API keys to enable additional features. Keys are stored securely in
-                  Chrome sync storage.
-                </p>
-              </div>
-              <Badge variant="warning">Coming Soon</Badge>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                PM Dashboard Settings
+              </h1>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Configure your dashboard preferences and integrations
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              {saved && (
+                <span className="text-green-600 dark:text-green-400 text-sm flex items-center animate-fade-in">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Settings saved
+                </span>
+              )}
+              <Button onClick={handleSave} size="lg">
+                Save All Settings
+              </Button>
             </div>
           </div>
-        </Card>
+        </header>
 
-        {/* Save Button */}
-        <div className="flex items-center gap-4">
-          <Button onClick={handleSave} size="lg">
-            Save Settings
-          </Button>
-
-          {saved && (
-            <span className="text-green-600 text-sm flex items-center">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <title>Success</title>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+            <TabsTrigger value="general">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
-                  fillRule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clipRule="evenodd"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              Settings saved successfully
-            </span>
-          )}
-        </div>
+              General
+            </TabsTrigger>
+            <TabsTrigger value="api-keys">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
+              </svg>
+              API Keys
+            </TabsTrigger>
+            <TabsTrigger value="widgets">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+                />
+              </svg>
+              Widgets
+            </TabsTrigger>
+            <TabsTrigger value="data">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                />
+              </svg>
+              Data
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="general">
+            <GeneralSettings settings={settings} onChange={handleSettingChange} />
+          </TabsContent>
+
+          <TabsContent value="api-keys">
+            <ApiKeyManager />
+          </TabsContent>
+
+          <TabsContent value="widgets">
+            <WidgetPreferences />
+          </TabsContent>
+
+          <TabsContent value="data">
+            <DataSettings />
+          </TabsContent>
+        </Tabs>
+
+        {/* Footer */}
+        <footer className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+            <p>PM Dashboard v{chrome.runtime.getManifest().version}</p>
+            <div className="flex items-center space-x-4">
+              <a
+                href="#"
+                className="hover:text-gray-700 dark:hover:text-gray-300"
+                onClick={(e) => {
+                  e.preventDefault()
+                  chrome.tabs.create({ url: "https://github.com/yourusername/pm-dashboard" })
+                }}
+              >
+                GitHub
+              </a>
+              <a
+                href="#"
+                className="hover:text-gray-700 dark:hover:text-gray-300"
+                onClick={(e) => {
+                  e.preventDefault()
+                  chrome.tabs.create({ url: "https://github.com/yourusername/pm-dashboard/issues" })
+                }}
+              >
+                Report Issue
+              </a>
+              <a
+                href="#"
+                className="hover:text-gray-700 dark:hover:text-gray-300"
+                onClick={(e) => {
+                  e.preventDefault()
+                  chrome.tabs.create({ url: chrome.runtime.getURL("tabs/newtab.html") })
+                }}
+              >
+                View Dashboard
+              </a>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   )

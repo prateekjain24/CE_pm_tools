@@ -57,6 +57,18 @@ export type MessageRequest =
   | { type: "GET_DASHBOARD_LAYOUT" }
   | { type: "RESET_DASHBOARD_LAYOUT" }
 
+  // API Key operations
+  | {
+      type: "TEST_API_CONNECTION"
+      service: "github" | "jira" | "producthunt" | "custom"
+      key: string
+      metadata?: {
+        jiraEmail?: string
+        jiraDomain?: string
+        customUrl?: string
+      }
+    }
+
 /**
  * Calculator types
  */
@@ -122,6 +134,9 @@ export type MessageResponses = {
   SAVE_DASHBOARD_LAYOUT: MessageResponse<void>
   GET_DASHBOARD_LAYOUT: MessageResponse<unknown>
   RESET_DASHBOARD_LAYOUT: MessageResponse<void>
+
+  // API Key responses
+  TEST_API_CONNECTION: MessageResponse<{ isValid: boolean; message?: string }>
 }
 
 // ========== Additional Types ==========
