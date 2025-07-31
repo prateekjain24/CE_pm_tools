@@ -31,6 +31,8 @@ interface RoiCalculatorProps {
 export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorProps) {
   const [calculations, setCalculations] = useStorage<RoiCalculation[]>("roi-history", [])
   const [showHistory, setShowHistory] = useState(false)
+  const [projectNameError, setProjectNameError] = useState<string>()
+  const [attemptedSave, setAttemptedSave] = useState(false)
 
   // Form state
   const [projectName, setProjectName] = useState("")
@@ -43,9 +45,9 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
   const [costs, setCosts] = useState<LineItem[]>([])
   const [benefits, setBenefits] = useState<LineItem[]>([])
 
-  // Validation
+  // Validation - exclude project name from continuous validation
   const validation = useRoiValidation(
-    projectName,
+    "placeholder", // Pass non-empty string to avoid project name validation
     initialCost,
     costs,
     benefits,
@@ -87,8 +89,22 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
 
   // Save calculation
   const handleSave = useCallback(() => {
+    setAttemptedSave(true)
+
+    // Validate project name
     if (!projectName.trim()) {
-      alert("Please enter a project name")
+      setProjectNameError("Project name is required")
+      return
+    }
+
+    if (projectName.length > 100) {
+      setProjectNameError("Project name is too long (max 100 characters)")
+      return
+    }
+
+    // Check other validations
+    if (!validation.isValid) {
+      alert("Please fix validation errors before saving")
       return
     }
 
@@ -107,7 +123,11 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
     setBenefits([])
     setTimeHorizon(12)
     setDiscountRate(10)
-  }, [currentCalculation, currentMetrics, projectName, setCalculations])
+    setProjectNameError(undefined)
+    setAttemptedSave(false)
+
+    alert("Calculation saved successfully!")
+  }, [currentCalculation, currentMetrics, projectName, validation.isValid, setCalculations])
 
   // Load calculation from history
   const handleLoadCalculation = useCallback((calculation: RoiCalculation) => {
@@ -121,6 +141,8 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
     setDiscountRate(calculation.discountRate)
     setCurrency(calculation.currency)
     setShowHistory(false)
+    setProjectNameError(undefined)
+    setAttemptedSave(false)
   }, [])
 
   return (
@@ -145,13 +167,14 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
     >
       {() => (
         <div className="p-6 space-y-6">
-          {/* Validation Summary */}
-          {validation.errors.length > 0 && (
+          {/* Validation Summary - only show non-project name errors or all errors after save attempt */}
+          {(validation.errors.length > 0 || (attemptedSave && projectNameError)) && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
                 Please fix the following errors:
               </h4>
               <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
+                {attemptedSave && projectNameError && <li>{projectNameError}</li>}
                 {validation.errors.map((error) => (
                   <li key={`${error.field}-${error.message}`}>{error.message}</li>
                 ))}
@@ -178,10 +201,14 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
             <Input
               label="Project Name"
               value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
+              onChange={(e) => {
+                setProjectName(e.target.value)
+                setProjectNameError(undefined)
+                setAttemptedSave(false)
+              }}
               placeholder="e.g., New CRM Implementation"
               required
-              error={getFieldError(validation.errors, "projectName")}
+              error={projectNameError}
             />
 
             <textarea
@@ -311,6 +338,8 @@ export default function RoiCalculator({ widgetId, widgetConfig }: RoiCalculatorP
                 setBenefits([])
                 setTimeHorizon(12)
                 setDiscountRate(10)
+                setProjectNameError(undefined)
+                setAttemptedSave(false)
               }}
             >
               Reset

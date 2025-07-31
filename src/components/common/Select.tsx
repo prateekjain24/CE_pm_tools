@@ -1,4 +1,4 @@
-import type { SelectHTMLAttributes } from "react"
+import type { ReactNode, SelectHTMLAttributes } from "react"
 import { forwardRef } from "react"
 
 interface SelectOption {
@@ -11,9 +11,10 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
   helperText?: string
-  options: SelectOption[]
+  options?: SelectOption[]
   fullWidth?: boolean
   placeholder?: string
+  children?: ReactNode
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
@@ -27,6 +28,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       placeholder = "Select an option",
       className = "",
       id,
+      children,
       ...props
     },
     ref
@@ -53,16 +55,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         )}
 
         <select ref={ref} id={selectId} className={selectClasses} {...props}>
-          {placeholder && (
+          {placeholder && !children && (
             <option value="" disabled>
               {placeholder}
             </option>
           )}
-          {options.map((option) => (
-            <option key={option.value} value={option.value} disabled={option.disabled}>
-              {option.label}
-            </option>
-          ))}
+          {children ||
+            options?.map((option) => (
+              <option key={option.value} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </option>
+            ))}
         </select>
 
         {(error || helperText) && (

@@ -58,6 +58,10 @@ export default function TamCalculator({ widgetId, widgetConfig }: TamCalculatorP
   const calculateMarkets = useCallback(() => {
     try {
       if (method === "topDown") {
+        // Return empty result if TAM is not set
+        if (topDownValues.tam <= 0) {
+          return { tam: 0, sam: 0, som: 0, method: "topDown", assumptions: [], confidence: 0 }
+        }
         return calculateTopDown({
           tam: topDownValues.tam,
           samPercentage: topDownValues.samPercentage,
