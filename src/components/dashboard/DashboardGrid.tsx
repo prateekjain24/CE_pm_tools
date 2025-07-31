@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { calculateResponsiveLayout } from "~/lib/dashboard/defaultLayout"
 import type { WidgetConfig } from "~/types"
 import { WidgetContainer } from "./WidgetContainer"
+import { WidgetSettings } from "./WidgetSettings"
 
 interface DashboardGridProps {
   layout: WidgetConfig[]
@@ -12,6 +13,7 @@ export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
   const gridRef = useRef<HTMLDivElement>(null)
   const [isClient, setIsClient] = useState(false)
   const [screenWidth, setScreenWidth] = useState(1200)
+  const [settingsWidget, setSettingsWidget] = useState<WidgetConfig | null>(null)
 
   // Handle client-side rendering
   useEffect(() => {
@@ -79,8 +81,7 @@ export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
             onLayoutChange(updatedLayout)
           }}
           onSettings={() => {
-            // Open widget settings (to be implemented)
-            console.log("Widget settings:", widget.id)
+            setSettingsWidget(widget)
           }}
         />
       ))}
@@ -95,6 +96,22 @@ export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Widget Settings Modal */}
+      {settingsWidget && (
+        <WidgetSettings
+          widget={settingsWidget}
+          open={!!settingsWidget}
+          onClose={() => setSettingsWidget(null)}
+          onSave={(settings) => {
+            // Update widget settings
+            const updatedLayout = layout.map((w) =>
+              w.id === settingsWidget.id ? { ...w, settings } : w
+            )
+            onLayoutChange(updatedLayout)
+          }}
+        />
       )}
     </div>
   )
