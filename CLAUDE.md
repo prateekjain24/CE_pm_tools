@@ -305,9 +305,13 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
   - Story 2.4: Quick Actions Popup
   - Story 2.5: Settings Page
   - Story 2.6: Navigation & Routing
+- ⏳ Epic 3: PM Calculators (In Progress)
+  - ✅ Story 3.1: RICE Score Calculator
+  - ✅ Story 3.2: TAM/SAM/SOM Calculator
+  - ✅ Story 3.3: ROI Calculator
+  - 🔲 Story 3.4: A/B Test Calculator
 
 ### Ready for Implementation
-- Epic 3: PM Calculators (RICE, TAM/SAM/SOM, ROI, A/B Test)
 - Epic 4: Data Feeds & Integrations
 - Epic 5: Web Clipper & Content Scripts
 - Epic 6: Advanced Features
@@ -335,3 +339,4 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
 - Error boundaries are critical for widget isolation
 - URL parameters enable deep linking to specific features
 - Do not mention claude code in commit message
+- Never add claude code or claude in co authored

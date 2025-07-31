@@ -135,18 +135,177 @@ export interface IndustryBenchmark {
 }
 
 /**
- * ROI (Return on Investment) Calculator
+ * ROI (Return on Investment) Calculator - Comprehensive Types
+ */
+
+/**
+ * Time period for calculations
+ */
+export type TimePeriod = "monthly" | "quarterly" | "annual"
+
+/**
+ * Cost/benefit categories
+ */
+export type CostCategory =
+  | "development"
+  | "marketing"
+  | "operations"
+  | "infrastructure"
+  | "licensing"
+  | "other"
+export type BenefitCategory = "revenue" | "cost_savings" | "efficiency" | "strategic" | "other"
+
+/**
+ * Line item for costs or benefits
+ */
+export interface LineItem {
+  id: string
+  category: CostCategory | BenefitCategory
+  description: string
+  amount: number
+  startMonth: number // 1-based month when this item starts
+  months: number // Duration in months
+  isRecurring: boolean
+  probability?: number // 0-100 for risk adjustment
+}
+
+/**
+ * Advanced ROI metrics
+ */
+export interface RoiMetrics {
+  simpleRoi: number // ((Total Benefits - Total Costs) / Total Costs) × 100
+  npv: number // Net Present Value
+  irr: number // Internal Rate of Return (annualized percentage)
+  mirr?: number // Modified IRR
+  paybackPeriod: number // Months to break even
+  discountedPaybackPeriod?: number // Considering time value of money
+  breakEvenMonth: number // Month when cumulative cash flow becomes positive
+  pi?: number // Profitability Index (NPV / Initial Investment)
+  eva?: number // Economic Value Added
+}
+
+/**
+ * Risk factor for risk-adjusted calculations
+ */
+export interface RiskFactor {
+  id: string
+  name: string
+  category: "technical" | "market" | "operational" | "financial"
+  probability: number // 0-1 probability of occurring
+  impact: number // Multiplier on affected items
+  affectedItems: string[] // IDs of line items affected
+  mitigation?: {
+    description: string
+    cost: number
+    effectiveness: number // 0-1 reduction in risk
+  }
+}
+
+/**
+ * Main ROI calculation interface
  */
 export interface RoiCalculation {
   id: string
   name: string
-  investment: number
-  returns: number
-  timeframeDays: number
-  roi: number // Calculated: ((returns - investment) / investment) * 100
-  annualizedRoi?: number // ROI projected to annual basis
+  description?: string
+
+  // Core inputs
+  initialCost: number
+  recurringCosts: LineItem[]
+  benefits: LineItem[]
+
+  // Time and financial parameters
+  timeHorizon: number // Total months to analyze
+  timePeriod: TimePeriod
+  discountRate: number // Annual percentage for NPV
+  discountMethod?: "manual" | "wacc" // How discount rate is determined
+  currency: Currency
+
+  // Risk assessment
+  riskFactors?: RiskFactor[]
+  confidenceLevel?: number // 0-100 overall confidence
+
+  // Calculated metrics
+  metrics?: RoiMetrics
+  monthlyProjections?: MonthlyProjection[]
+
+  // Metadata
+  template?: string // ID of template used
   savedAt: Date
   notes?: string
+}
+
+/**
+ * Monthly cash flow projection
+ */
+export interface MonthlyProjection {
+  month: number
+  costs: number
+  benefits: number
+  netCashFlow: number
+  cumulativeCashFlow: number
+  discountedCashFlow?: number
+  discountedCumulative?: number
+}
+
+/**
+ * ROI scenario for comparison
+ */
+export interface RoiScenario {
+  id: string
+  name: string
+  description: string
+  baseCalculation: RoiCalculation
+  adjustments: {
+    costMultiplier: number // 1.0 = no change
+    benefitMultiplier: number
+    delayMonths: number // Delay in benefit realization
+    riskAdjustment: number // Additional risk factor
+  }
+  results?: RoiMetrics
+  confidence: number
+}
+
+/**
+ * Industry template for ROI calculations
+ */
+export interface RoiTemplate {
+  id: string
+  name: string
+  description: string
+  industry: string
+  category: "software" | "marketing" | "infrastructure" | "operations"
+  defaultValues: {
+    timeHorizon: number
+    discountRate: number
+    currency: Currency
+    costs: Partial<LineItem>[]
+    benefits: Partial<LineItem>[]
+  }
+  benchmarks: {
+    typicalRoi: { min: number; max: number; median: number }
+    paybackPeriod: { min: number; max: number; median: number }
+    successRate: number // 0-1 probability of success
+  }
+  tips: string[]
+}
+
+/**
+ * Monte Carlo simulation results
+ */
+export interface MonteCarloResults {
+  iterations: number
+  metrics: {
+    roi: { p10: number; p50: number; p90: number; mean: number; stdDev: number }
+    npv: { p10: number; p50: number; p90: number; mean: number; stdDev: number }
+    payback: { p10: number; p50: number; p90: number; mean: number; stdDev: number }
+  }
+  successProbability: number // Probability of positive NPV
+  distributions: {
+    roi: number[]
+    npv: number[]
+    payback: number[]
+  }
 }
 
 /**

@@ -4,7 +4,7 @@ import { Button } from "~/components/common/Button"
 import { Input } from "~/components/common/Input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/common/Tabs"
 import { getFieldError, useRiceValidation, validateProjectName } from "~/hooks/useRiceValidation"
-import { calculateRiceScore, formatRiceScore, getRiceScoreCategory } from "~/lib/calculators/rice"
+import { calculateRiceScore, getRiceScoreCategory } from "~/lib/calculators/rice"
 import type { RiceScore } from "~/types"
 import { RICE_IMPACT_VALUES } from "~/types"
 import { BaseWidget } from "./BaseWidget"
@@ -418,8 +418,8 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                     Validation Warnings
                   </h4>
                   <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-                    {validation.warnings.map((warning, index) => (
-                      <li key={index}>• {warning}</li>
+                    {validation.warnings.map((warning) => (
+                      <li key={warning}>• {warning}</li>
                     ))}
                   </ul>
                 </div>

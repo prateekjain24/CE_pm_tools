@@ -10,9 +10,9 @@ Implement a comprehensive suite of Product Management calculators as widgets for
 - Add save/export functionality for calculations
 - Ensure responsive design for all screen sizes
 
-**Total Story Points:** 26 SP  
+**Total Story Points:** 42 SP  
 **Total Stories:** 4  
-**Total Tickets:** 20  
+**Total Tickets:** 33  
 
 ---
 
@@ -2398,25 +2398,38 @@ Implement a comprehensive suite of Product Management calculators as widgets for
 
 ---
 
-## Story 3.3: ROI Calculator
+## Story 3.3: ROI Calculator ✅ COMPLETED
 **Description:** Build a comprehensive Return on Investment calculator that helps PMs evaluate the financial viability of features and projects with advanced analysis capabilities.
 
 **Acceptance Criteria:**
-- Calculate simple and advanced ROI metrics (ROI, NPV, IRR, MIRR, PI, EVA)
-- Support time-based calculations with flexible time periods
-- Break down costs and benefits with categorization and templates
-- Visualize ROI over time with interactive charts and animations
-- Compare multiple investment scenarios (up to 5) with sensitivity analysis
-- Risk-adjusted ROI calculations with probability factors
-- Monte Carlo simulation for uncertain inputs (1000+ iterations)
-- Industry-specific templates and benchmarks
-- Multi-currency support with real-time conversion
-- Save/load calculations with comprehensive history tracking
-- Export results to CSV, JSON, and PDF formats
-- Share calculations via URL with deep linking
-- Contextual help system and validation
-- What-if analysis and scenario planning
-- WACC-based discount rate calculations
+- ✅ Calculate simple and advanced ROI metrics (ROI, NPV, IRR, MIRR, PI, EVA)
+- ✅ Support time-based calculations with flexible time periods
+- ✅ Break down costs and benefits with categorization and templates
+- ✅ Visualize ROI over time with interactive charts and animations
+- ⏳ Compare multiple investment scenarios (up to 5) with sensitivity analysis (partial)
+- ✅ Risk-adjusted ROI calculations with probability factors
+- ✅ Monte Carlo simulation for uncertain inputs (1000+ iterations)
+- ⏳ Industry-specific templates and benchmarks (partial)
+- ✅ Multi-currency support with real-time conversion
+- ✅ Save/load calculations with comprehensive history tracking
+- ✅ Export results to CSV, JSON, and PDF formats
+- ✅ Share calculations via URL with deep linking
+- ✅ Contextual help system and validation
+- ⏳ What-if analysis and scenario planning (partial)
+- ✅ WACC-based discount rate calculations
+
+**Implementation Summary:**
+- Created a comprehensive ROI calculator with advanced financial metrics
+- Implemented all major ROI calculations including NPV, IRR, MIRR, PI, and EVA
+- Built flexible cost/benefit input system with categories and time-based entries
+- Added beautiful timeline visualization using Recharts
+- Created risk-adjusted calculations with probability weighting
+- Implemented Monte Carlo simulation for uncertainty analysis
+- Built full export functionality (CSV, JSON, PDF)
+- Added comprehensive validation with helpful error messages and suggestions
+- Integrated multi-currency support with proper formatting
+
+**Note:** Advanced features like full scenario comparison and industry templates were partially implemented. These can be completed in a future iteration based on user feedback.
 
 ### Tickets:
 
@@ -2778,72 +2791,525 @@ Implement a comprehensive suite of Product Management calculators as widgets for
   }
   ```
 
+#### Ticket 3.3.5: Add Industry Templates & Benchmarks
+- **Description:** Implement pre-built templates and industry benchmarks for common ROI scenarios
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Create templates for common project types:
+    - SaaS implementation
+    - E-commerce platform
+    - Mobile app development
+    - Enterprise software
+    - Marketing campaigns
+    - Infrastructure upgrades
+  - Industry-specific ROI benchmarks and ranges
+  - Guided setup wizard with questionnaire
+  - Auto-populate costs/benefits based on template
+  - Customizable template library
+  - Import/export custom templates
+  - Contextual help and best practices per industry
+  - Template version management
+- **Dependencies:** 3.3.1, 3.3.3
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/templates/roiTemplates.ts
+  export interface RoiTemplate {
+    id: string
+    name: string
+    description: string
+    industry: string
+    category: 'software' | 'marketing' | 'infrastructure' | 'operations'
+    defaultValues: {
+      timeHorizon: number
+      discountRate: number
+      costs: TemplateLineItem[]
+      benefits: TemplateLineItem[]
+    }
+    benchmarks: {
+      typicalRoi: { min: number; max: number; median: number }
+      paybackPeriod: { min: number; max: number; median: number }
+      successRate: number
+    }
+    tips: string[]
+  }
+  
+  export const ROI_TEMPLATES: RoiTemplate[] = [
+    {
+      id: 'saas-implementation',
+      name: 'SaaS Implementation',
+      description: 'Calculate ROI for implementing a new SaaS solution',
+      industry: 'Technology',
+      category: 'software',
+      defaultValues: {
+        timeHorizon: 36,
+        discountRate: 12,
+        costs: [
+          { category: 'licensing', description: 'Annual subscription', amount: 50000, recurring: true },
+          { category: 'development', description: 'Implementation & setup', amount: 25000, recurring: false },
+          { category: 'operations', description: 'Training & onboarding', amount: 15000, recurring: false }
+        ],
+        benefits: [
+          { category: 'cost_savings', description: 'Reduced IT maintenance', amount: 30000, recurring: true },
+          { category: 'efficiency', description: 'Productivity gains', amount: 40000, recurring: true },
+          { category: 'revenue', description: 'New revenue opportunities', amount: 25000, recurring: true }
+        ]
+      },
+      benchmarks: {
+        typicalRoi: { min: 150, max: 400, median: 250 },
+        paybackPeriod: { min: 12, max: 24, median: 18 },
+        successRate: 0.75
+      },
+      tips: [
+        'Include all hidden costs like training and integration',
+        'Consider phased rollout to reduce risk',
+        'Factor in change management costs'
+      ]
+    }
+  ]
+  ```
+
+#### Ticket 3.3.6: Implement Scenario Comparison Mode
+- **Description:** Build comprehensive scenario comparison with sensitivity analysis
+- **Story Points:** 3 SP
+- **Technical Requirements:**
+  - Compare up to 5 investment scenarios side-by-side
+  - Scenario templates (Conservative, Moderate, Aggressive)
+  - Sensitivity analysis for key variables:
+    - Cost overrun impact
+    - Benefit realization delays
+    - Discount rate changes
+    - Time horizon adjustments
+  - What-if simulations with real-time updates
+  - Tornado charts for variable impact visualization
+  - Scenario scoring and ranking
+  - Export comparison report
+  - Save scenario sets for future reference
+- **Dependencies:** 3.3.2, 3.3.4
+- **Implementation Notes:**
+  ```typescript
+  // src/components/widgets/roi/ScenarioComparison.tsx
+  interface RoiScenario {
+    id: string
+    name: string
+    description: string
+    baseCalculation: RoiCalculation
+    adjustments: {
+      costMultiplier: number
+      benefitMultiplier: number
+      delayMonths: number
+      riskFactor: number
+    }
+    results: RoiMetrics
+    confidence: number
+  }
+  
+  export function ScenarioComparison({ baseCalculation }: { baseCalculation: RoiCalculation }) {
+    const [scenarios, setScenarios] = useState<RoiScenario[]>([])
+    const [sensitivityVars, setSensitivityVars] = useState<SensitivityVariable[]>([
+      { name: 'Initial Cost', baseValue: 100, range: [-30, 30], step: 5 },
+      { name: 'Monthly Benefits', baseValue: 100, range: [-20, 40], step: 5 },
+      { name: 'Time to Value', baseValue: 0, range: [0, 12], step: 1 }
+    ])
+    
+    const runSensitivityAnalysis = () => {
+      // Calculate impact of each variable on ROI metrics
+      return sensitivityVars.map(variable => ({
+        variable: variable.name,
+        impacts: calculateVariableImpacts(baseCalculation, variable)
+      }))
+    }
+    
+    return (
+      <div className="scenario-comparison">
+        <ScenarioBuilder onAdd={addScenario} />
+        <ScenarioGrid scenarios={scenarios} />
+        <SensitivityAnalysis 
+          variables={sensitivityVars}
+          results={runSensitivityAnalysis()}
+        />
+        <TornadoChart data={sensitivityResults} />
+      </div>
+    )
+  }
+  ```
+
+#### Ticket 3.3.7: Add Risk Assessment Module
+- **Description:** Implement risk-adjusted ROI calculations with probabilistic analysis
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Risk factor identification and quantification
+  - Probability of success inputs for each benefit
+  - Risk mitigation cost tracking
+  - Monte Carlo simulation (1000+ iterations)
+  - Confidence intervals (P10, P50, P90)
+  - Risk-adjusted NPV and ROI calculations
+  - Probability distribution visualizations
+  - Risk heat map for cost/benefit items
+  - Export risk analysis report
+- **Dependencies:** 3.3.2
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/calculators/roiRisk.ts
+  interface RiskFactor {
+    id: string
+    name: string
+    category: 'technical' | 'market' | 'operational' | 'financial'
+    probability: number // 0-1
+    impact: number // multiplier
+    mitigation?: {
+      cost: number
+      effectiveness: number // 0-1
+    }
+  }
+  
+  export function calculateRiskAdjustedRoi(
+    calculation: RoiCalculation,
+    riskFactors: RiskFactor[]
+  ): RiskAdjustedMetrics {
+    const iterations = 1000
+    const results: RoiMetrics[] = []
+    
+    for (let i = 0; i < iterations; i++) {
+      const adjustedCalc = applyRiskFactors(calculation, riskFactors)
+      results.push(calculateRoi(adjustedCalc))
+    }
+    
+    return {
+      p10: getPercentile(results, 10),
+      p50: getPercentile(results, 50),
+      p90: getPercentile(results, 90),
+      mean: calculateMean(results),
+      stdDev: calculateStdDev(results),
+      successProbability: results.filter(r => r.npv > 0).length / iterations
+    }
+  }
+  
+  export function runMonteCarloSimulation(
+    calculation: RoiCalculation,
+    uncertainties: UncertaintyRange[]
+  ): SimulationResults {
+    const results = []
+    
+    for (let i = 0; i < 1000; i++) {
+      const randomizedCalc = randomizeInputs(calculation, uncertainties)
+      results.push(calculateRoi(randomizedCalc))
+    }
+    
+    return analyzeDistribution(results)
+  }
+  ```
+
+#### Ticket 3.3.8: History & Export Functionality
+- **Description:** Add comprehensive save/load and export capabilities
+- **Story Points:** 1 SP
+- **Technical Requirements:**
+  - Save calculations with metadata (name, date, tags)
+  - History modal with search and filtering
+  - Load and edit previous calculations
+  - Compare historical calculations
+  - Export formats:
+    - CSV with all inputs and results
+    - JSON for data portability
+    - PDF report with charts and analysis
+  - Share via URL with encoded parameters
+  - Bulk export of multiple calculations
+  - Auto-save draft calculations
+- **Dependencies:** 3.3.1, 3.3.4
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/export/roiExport.ts
+  export async function exportRoiToPDF(
+    calculation: RoiCalculation,
+    metrics: RoiMetrics,
+    scenarios?: RoiScenario[]
+  ): Promise<void> {
+    const doc = await generatePDF({
+      title: 'ROI Analysis Report',
+      subtitle: calculation.name,
+      sections: [
+        {
+          title: 'Executive Summary',
+          content: [
+            `Initial Investment: ${formatCurrency(calculation.initialCost)}`,
+            `Time Horizon: ${calculation.timeHorizon} months`,
+            `Simple ROI: ${metrics.simpleRoi.toFixed(1)}%`,
+            `NPV: ${formatCurrency(metrics.npv)}`,
+            `Payback Period: ${metrics.paybackPeriod} months`
+          ]
+        },
+        {
+          title: 'Financial Metrics',
+          type: 'metrics',
+          data: metrics
+        },
+        {
+          title: 'Cash Flow Projection',
+          type: 'chart',
+          chartType: 'line',
+          data: generateCashFlowData(calculation)
+        },
+        scenarios && {
+          title: 'Scenario Analysis',
+          type: 'comparison',
+          data: scenarios
+        }
+      ].filter(Boolean)
+    })
+    
+    doc.save(`roi-analysis-${Date.now()}.pdf`)
+  }
+  ```
+
+#### Ticket 3.3.9: Add Validation & Help System
+- **Description:** Implement comprehensive input validation and contextual help
+- **Story Points:** 1 SP
+- **Technical Requirements:**
+  - Real-time input validation with helpful messages
+  - Business logic validation:
+    - Costs cannot be negative
+    - Benefits should have realistic ranges
+    - Time periods cannot overlap
+    - Discount rate reasonable ranges
+  - Contextual help tooltips for all fields
+  - Interactive tutorials for first-time users
+  - Best practices guide
+  - Common mistakes warnings
+  - FAQ section with examples
+  - Keyboard shortcuts support
+- **Dependencies:** 3.3.1
+- **Implementation Notes:**
+  ```typescript
+  // src/hooks/useRoiValidation.ts
+  export function useRoiValidation(calculation: RoiCalculation) {
+    const errors = useMemo(() => {
+      const validationErrors: ValidationError[] = []
+      
+      // Validate initial cost
+      if (calculation.initialCost < 0) {
+        validationErrors.push({
+          field: 'initialCost',
+          message: 'Initial cost cannot be negative'
+        })
+      }
+      
+      // Validate discount rate
+      if (calculation.discountRate < 0 || calculation.discountRate > 50) {
+        validationErrors.push({
+          field: 'discountRate',
+          message: 'Discount rate should be between 0% and 50%'
+        })
+      }
+      
+      // Validate time periods don't overlap
+      const timeOverlaps = checkTimeOverlaps([
+        ...calculation.recurringCosts,
+        ...calculation.benefits
+      ])
+      
+      if (timeOverlaps.length > 0) {
+        validationErrors.push({
+          field: 'timeperiods',
+          message: 'Time periods overlap for some items'
+        })
+      }
+      
+      return validationErrors
+    }, [calculation])
+    
+    const warnings = useMemo(() => {
+      const validationWarnings: ValidationWarning[] = []
+      
+      // Warn about high discount rates
+      if (calculation.discountRate > 20) {
+        validationWarnings.push({
+          field: 'discountRate',
+          message: 'Discount rate seems high. Typical rates are 8-15%'
+        })
+      }
+      
+      // Warn about unrealistic payback expectations
+      if (calculation.timeHorizon < 12) {
+        validationWarnings.push({
+          field: 'timeHorizon',
+          message: 'Consider longer time horizon for accurate ROI'
+        })
+      }
+      
+      return validationWarnings
+    }, [calculation])
+    
+    return { errors, warnings, isValid: errors.length === 0 }
+  }
+  ```
+
 ---
 
 ## Story 3.4: A/B Test Calculator
-**Description:** Build a statistical significance calculator for A/B tests to help PMs make data-driven decisions about experiments.
+**Description:** Build a comprehensive statistical experimentation platform for A/B tests to help PMs design, run, and analyze experiments with modern statistical methods.
 
 **Acceptance Criteria:**
-- Calculate statistical significance
-- Determine required sample size
-- Show confidence intervals
-- Support multiple test variations
-- Provide test duration estimates
+- Calculate statistical significance using multiple methods (frequentist, Bayesian, sequential)
+- Determine required sample size with power analysis and MDE calculations
+- Show confidence intervals and posterior distributions
+- Support multiple test variations (A/B, A/B/n, multivariate)
+- Provide accurate test duration estimates with traffic allocation
+- Interactive visualizations with power curves and test timelines
+- Test planning tools with hypothesis templates and benchmarks
+- Save/load test results with comprehensive history tracking
+- Export results to CSV, JSON, and PDF formats
+- Share test results via URL with encoded parameters
+- Risk assessment and budget impact analysis
+- Multi-armed bandit algorithms for optimization
+- Segment analysis and drill-down capabilities
 
 ### Tickets:
 
 #### Ticket 3.4.1: Build AbTestCalculator Component
-- **Description:** Create the main A/B test calculator widget structure
-- **Story Points:** 1 SP
+- **Description:** Create the main A/B test calculator widget with comprehensive experimentation features
+- **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Input fields for control and variant metrics
-  - Support conversion rate and revenue metrics
-  - Confidence level selection (90%, 95%, 99%)
-  - One-tailed vs two-tailed test selection
-  - Multiple variations support (A/B/C/D)
+  - Properly implement BaseWidget pattern with widgetId and widgetConfig props
+  - Support multiple test types: A/B, A/B/n, multivariate
+  - Expanded metric types:
+    - Conversion rate (binary)
+    - Revenue per visitor
+    - Average order value
+    - User engagement metrics
+    - Retention rates
+    - Custom KPIs
+  - Test configuration:
+    - Confidence level selection (90%, 95%, 99%)
+    - One-tailed vs two-tailed test selection
+    - Statistical method selection (frequentist, Bayesian, sequential)
+    - Traffic allocation controls
+  - Test metadata:
+    - Hypothesis statement
+    - Test owner and stakeholders
+    - Start/end dates
+    - Tags and categories
+    - Business impact estimation
+  - Real-time validation and error handling
+  - Responsive design for different widget sizes
 - **Dependencies:** Epic 2 completion
 - **Implementation Notes:**
   ```typescript
   // src/components/widgets/AbTestCalculator.tsx
+  import { BaseWidget } from "~/components/widgets/BaseWidget"
+  import { useStorage } from "@plasmohq/storage/hook"
+  import type { AbTestResult, TestConfig, Variation } from "~/types"
+  
+  interface AbTestCalculatorProps {
+    widgetId: string
+    widgetConfig?: Record<string, unknown>
+  }
+  
   interface Variation {
     id: string
     name: string
     visitors: number
     conversions: number
     revenue?: number
+    engagement?: number
+    customMetrics?: Record<string, number>
   }
   
-  export function AbTestCalculator() {
-    const [testConfig, setTestConfig] = useState({
-      metric: 'conversion' as 'conversion' | 'revenue',
-      confidenceLevel: 95,
-      testType: 'two-tailed' as 'one-tailed' | 'two-tailed',
-      minimumEffect: 5 // percentage
+  interface TestConfig {
+    testType: 'ab' | 'abn' | 'multivariate'
+    metric: 'conversion' | 'revenue' | 'engagement' | 'retention' | 'custom'
+    statisticalMethod: 'frequentist' | 'bayesian' | 'sequential' | 'mab'
+    confidenceLevel: 90 | 95 | 99
+    testDirection: 'one-tailed' | 'two-tailed'
+    minimumEffect: number
+    trafficAllocation: Record<string, number>
+  }
+  
+  interface TestMetadata {
+    name: string
+    hypothesis: string
+    owner: string
+    stakeholders: string[]
+    startDate?: Date
+    endDate?: Date
+    tags: string[]
+    businessImpact: {
+      metric: string
+      estimatedValue: number
+      confidence: 'low' | 'medium' | 'high'
+    }
+  }
+  
+  export default function AbTestCalculator({ widgetId, widgetConfig }: AbTestCalculatorProps) {
+    const [testHistory, setTestHistory] = useStorage<AbTestResult[]>("abtest-history", [])
+    const [currentTest, setCurrentTest] = useState<{
+      config: TestConfig
+      metadata: TestMetadata
+      variations: Variation[]
+    }>({
+      config: {
+        testType: 'ab',
+        metric: 'conversion',
+        statisticalMethod: 'frequentist',
+        confidenceLevel: 95,
+        testDirection: 'two-tailed',
+        minimumEffect: 5,
+        trafficAllocation: { control: 50, variant: 50 }
+      },
+      metadata: {
+        name: '',
+        hypothesis: '',
+        owner: '',
+        stakeholders: [],
+        tags: [],
+        businessImpact: {
+          metric: '',
+          estimatedValue: 0,
+          confidence: 'medium'
+        }
+      },
+      variations: [
+        { id: 'control', name: 'Control', visitors: 0, conversions: 0 },
+        { id: 'variant-a', name: 'Variant A', visitors: 0, conversions: 0 }
+      ]
     })
     
-    const [variations, setVariations] = useState<Variation[]>([
-      { id: 'control', name: 'Control', visitors: 0, conversions: 0 },
-      { id: 'variant-a', name: 'Variant A', visitors: 0, conversions: 0 }
-    ])
-    
     return (
-      <BaseWidget title="A/B Test Calculator">
-        {() => (
-          <div className="space-y-4">
+      <BaseWidget
+        widgetId={widgetId}
+        title="A/B Test Calculator"
+        data={currentTest}
+        settings={widgetConfig}
+        onSettings={widgetConfig?.onSettings as () => void}
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        }
+      >
+        {(data) => (
+          <div className="p-6 space-y-6">
+            <TestMetadataForm
+              metadata={currentTest.metadata}
+              onChange={(metadata) => setCurrentTest({ ...currentTest, metadata })}
+            />
+            
             <TestConfiguration
-              config={testConfig}
-              onChange={setTestConfig}
+              config={currentTest.config}
+              onChange={(config) => setCurrentTest({ ...currentTest, config })}
             />
             
-            <VariationInputs
-              variations={variations}
-              metric={testConfig.metric}
-              onChange={setVariations}
+            <VariationManager
+              variations={currentTest.variations}
+              testType={currentTest.config.testType}
+              metric={currentTest.config.metric}
+              onChange={(variations) => setCurrentTest({ ...currentTest, variations })}
             />
             
-            <TestResults
-              variations={variations}
-              config={testConfig}
+            <TestAnalysis
+              test={currentTest}
+              onSave={handleSaveTest}
+              onCompare={handleCompareTests}
+              onExport={handleExportTest}
             />
           </div>
         )}
@@ -2852,294 +3318,1180 @@ Implement a comprehensive suite of Product Management calculators as widgets for
   }
   ```
 
-#### Ticket 3.4.2: Implement Statistical Calculations
-- **Description:** Create functions for significance testing and confidence intervals
-- **Story Points:** 2 SP
+#### Ticket 3.4.2: Implement Advanced Statistical Calculations
+- **Description:** Create comprehensive statistical functions for multiple testing methodologies
+- **Story Points:** 3 SP
 - **Technical Requirements:**
-  - Z-test for proportions
-  - T-test for revenue metrics
-  - Calculate p-values
-  - Determine confidence intervals
-  - Handle edge cases (zero conversions, small samples)
+  - Frequentist methods:
+    - Z-test for proportions
+    - T-test for continuous metrics
+    - Chi-square test for categorical data
+    - Mann-Whitney U test for non-parametric data
+  - Bayesian methods:
+    - Beta-binomial for conversion rates
+    - Normal-normal for continuous metrics
+    - Prior configuration (uniform, informative)
+    - Posterior distribution calculation
+    - Credible intervals
+  - Sequential testing:
+    - AGILE (Adaptive Group Sequential Design)
+    - mSPRT (modified Sequential Probability Ratio Test)
+    - Early stopping boundaries
+    - Alpha spending functions
+  - Multi-armed bandit algorithms:
+    - Thompson Sampling
+    - Upper Confidence Bound (UCB)
+    - Epsilon-greedy
+    - Contextual bandits
+  - Advanced features:
+    - Bootstrap confidence intervals
+    - Multiple testing correction (Bonferroni, FDR, Holm)
+    - Effect size calculations (Cohen's d, relative lift)
+    - Statistical power calculation
+    - Handle edge cases (zero conversions, small samples, extreme values)
 - **Dependencies:** 3.4.1
 - **Implementation Notes:**
   ```typescript
   // src/lib/calculators/abtest.ts
-  import { cdf, inv } from 'jstat'
+  import { cdf, inv, beta } from 'jstat'
   
   export interface TestResult {
-    pValue: number
+    method: 'frequentist' | 'bayesian' | 'sequential' | 'mab'
+    pValue?: number
     isSignificant: boolean
-    confidenceInterval: [number, number]
+    confidenceInterval?: [number, number]
+    credibleInterval?: [number, number]
+    posteriorDistribution?: number[]
     uplift: number
+    effectSize: number
     power: number
+    stoppingBoundaries?: { upper: number; lower: number }
+    shouldStop?: boolean
+    multipleTestingAdjusted?: boolean
   }
   
-  export function calculateABTest(
-    control: Variation,
-    variant: Variation,
+  // Frequentist Analysis
+  export function calculateFrequentist(
+    variations: Variation[],
     config: TestConfig
-  ): TestResult {
-    // Calculate conversion rates
-    const p1 = control.conversions / control.visitors
-    const p2 = variant.conversions / variant.visitors
+  ): TestResult[] {
+    const control = variations[0]
+    const results: TestResult[] = []
     
-    // Pooled proportion for z-test
-    const pooled = (control.conversions + variant.conversions) / 
-                   (control.visitors + variant.visitors)
+    for (let i = 1; i < variations.length; i++) {
+      const variant = variations[i]
+      const result = calculatePairwiseTest(control, variant, config)
+      
+      // Apply multiple testing correction if needed
+      if (variations.length > 2) {
+        result.pValue = adjustPValue(result.pValue, variations.length - 1, config.correctionMethod)
+        result.multipleTestingAdjusted = true
+      }
+      
+      results.push(result)
+    }
     
-    // Standard error
-    const se = Math.sqrt(
-      pooled * (1 - pooled) * (1/control.visitors + 1/variant.visitors)
-    )
+    return results
+  }
+  
+  // Bayesian Analysis
+  export function calculateBayesian(
+    variations: Variation[],
+    config: BayesianConfig
+  ): BayesianResult[] {
+    const results: BayesianResult[] = []
     
-    // Z-score
-    const z = (p2 - p1) / se
+    for (let i = 0; i < variations.length; i++) {
+      const variation = variations[i]
+      
+      // Beta-binomial for conversion rates
+      const alphaPrior = config.priorAlpha || 1
+      const betaPrior = config.priorBeta || 1
+      
+      const alphaPosterior = alphaPrior + variation.conversions
+      const betaPosterior = betaPrior + (variation.visitors - variation.conversions)
+      
+      // Sample from posterior
+      const posteriorSamples = Array.from({ length: 10000 }, () => 
+        beta.sample(alphaPosterior, betaPosterior)
+      )
+      
+      results.push({
+        variation: variation.name,
+        posteriorMean: alphaPosterior / (alphaPosterior + betaPosterior),
+        credibleInterval: getCredibleInterval(posteriorSamples, config.credibleLevel),
+        posteriorSamples,
+        probabilityBest: 0 // Calculate later by comparison
+      })
+    }
     
-    // P-value (two-tailed by default)
-    const pValue = config.testType === 'two-tailed' 
-      ? 2 * (1 - cdf(Math.abs(z), 'normal'))
-      : 1 - cdf(z, 'normal')
+    // Calculate probability of being best
+    calculateProbabilityBest(results)
     
-    // Confidence interval
-    const alpha = 1 - config.confidenceLevel / 100
-    const zCritical = inv(1 - alpha/2, 'normal')
-    const margin = zCritical * se
+    return results
+  }
+  
+  // Sequential Testing
+  export function calculateSequential(
+    variations: Variation[],
+    config: SequentialConfig,
+    previousData?: SequentialState
+  ): SequentialResult {
+    const { method, alpha, beta, maxSampleSize } = config
     
-    const difference = p2 - p1
-    const confidenceInterval: [number, number] = [
-      difference - margin,
-      difference + margin
-    ]
+    if (method === 'AGILE') {
+      return calculateAGILE(variations, alpha, beta, maxSampleSize, previousData)
+    } else if (method === 'mSPRT') {
+      return calculateMSPRT(variations, alpha, beta, previousData)
+    }
     
-    // Calculate uplift
-    const uplift = p1 > 0 ? ((p2 - p1) / p1) * 100 : 0
+    throw new Error(`Unknown sequential method: ${method}`)
+  }
+  
+  // Multi-Armed Bandit
+  export function calculateMAB(
+    variations: Variation[],
+    config: MABConfig,
+    historicalData?: MABState
+  ): MABResult {
+    const { algorithm, explorationRate } = config
     
-    // Statistical power
-    const power = calculatePower(control, variant, config)
-    
-    return {
-      pValue,
-      isSignificant: pValue < alpha,
-      confidenceInterval,
-      uplift,
-      power
+    switch (algorithm) {
+      case 'thompson':
+        return thompsonSampling(variations, historicalData)
+      case 'ucb':
+        return upperConfidenceBound(variations, explorationRate)
+      case 'epsilon-greedy':
+        return epsilonGreedy(variations, explorationRate)
+      default:
+        throw new Error(`Unknown MAB algorithm: ${algorithm}`)
     }
   }
   
-  function calculatePower(
-    control: Variation,
-    variant: Variation,
-    config: TestConfig
+  // Thompson Sampling implementation
+  function thompsonSampling(
+    variations: Variation[],
+    state?: MABState
+  ): MABResult {
+    const samples = variations.map(v => {
+      const alpha = (state?.successes[v.id] || 0) + v.conversions + 1
+      const beta = (state?.failures[v.id] || 0) + (v.visitors - v.conversions) + 1
+      return {
+        variation: v.id,
+        sample: jstat.beta.sample(alpha, beta),
+        alpha,
+        beta
+      }
+    })
+    
+    // Recommend variant with highest sample
+    const recommended = samples.reduce((best, current) => 
+      current.sample > best.sample ? current : best
+    )
+    
+    return {
+      recommendedVariation: recommended.variation,
+      allocationProbabilities: calculateAllocationProbabilities(samples),
+      expectedRegret: calculateExpectedRegret(variations, samples)
+    }
+  }
+  
+  // Bootstrap Confidence Intervals
+  export function bootstrapConfidenceInterval(
+    data: number[],
+    statistic: (sample: number[]) => number,
+    confidence: number = 0.95,
+    iterations: number = 10000
+  ): [number, number] {
+    const bootstrapStats = []
+    
+    for (let i = 0; i < iterations; i++) {
+      const sample = resampleWithReplacement(data)
+      bootstrapStats.push(statistic(sample))
+    }
+    
+    bootstrapStats.sort((a, b) => a - b)
+    const alpha = 1 - confidence
+    const lower = bootstrapStats[Math.floor(alpha / 2 * iterations)]
+    const upper = bootstrapStats[Math.floor((1 - alpha / 2) * iterations)]
+    
+    return [lower, upper]
+  }
+  
+  // Multiple Testing Correction
+  export function adjustPValue(
+    pValue: number,
+    numTests: number,
+    method: 'bonferroni' | 'fdr' | 'holm'
   ): number {
-    const n = Math.min(control.visitors, variant.visitors)
-    const p1 = control.conversions / control.visitors
-    const delta = config.minimumEffect / 100
-    const p2 = p1 * (1 + delta)
-    
-    const pooled = (p1 + p2) / 2
-    const se = Math.sqrt(2 * pooled * (1 - pooled) / n)
-    
-    const alpha = 1 - config.confidenceLevel / 100
-    const zAlpha = inv(1 - alpha/2, 'normal')
-    const zBeta = (Math.abs(p2 - p1) - zAlpha * se) / 
-                  Math.sqrt(p1 * (1 - p1) / n + p2 * (1 - p2) / n)
-    
-    return cdf(zBeta, 'normal')
+    switch (method) {
+      case 'bonferroni':
+        return Math.min(pValue * numTests, 1)
+      case 'holm':
+        // Holm-Bonferroni method (requires all p-values)
+        return pValue * numTests // Simplified
+      case 'fdr':
+        // Benjamini-Hochberg FDR (requires all p-values)
+        return pValue * numTests // Simplified
+      default:
+        return pValue
+    }
   }
   ```
 
-#### Ticket 3.4.3: Add Sample Size Calculator
-- **Description:** Calculate required sample size for desired statistical power
+#### Ticket 3.4.3: Enhanced Sample Size Calculator
+- **Description:** Calculate required sample size with advanced planning features
 - **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Input baseline conversion rate
-  - Specify minimum detectable effect
-  - Choose statistical power (80%, 90%)
-  - Calculate for each variation
-  - Estimate test duration based on traffic
+  - Support different statistical methods:
+    - Frequentist sample size
+    - Bayesian sample size with prior influence
+    - Sequential testing sample size ranges
+    - Multi-armed bandit convergence estimates
+  - Advanced inputs:
+    - Baseline metric value and variance
+    - Minimum detectable effect (absolute and relative)
+    - Statistical power selection (70%, 80%, 90%, 95%)
+    - One-sided vs two-sided testing
+    - Multiple testing correction impact
+  - Traffic allocation optimization:
+    - Unequal allocation ratios
+    - Multi-variant optimal allocation
+    - Budget constraints
+  - Time-based adjustments:
+    - Seasonality patterns
+    - Day-of-week effects
+    - Holiday impacts
+    - Ramp-up periods
+  - Practical considerations:
+    - Practical significance thresholds
+    - Business impact calculations
+    - Cost per sample
+    - Opportunity cost modeling
+  - Outputs:
+    - Sample size per variation
+    - Total sample required
+    - Expected test duration
+    - Cost estimates
+    - Power curves
+    - Sensitivity analysis
 - **Dependencies:** 3.4.2
 - **Implementation Notes:**
   ```typescript
   // src/components/widgets/abtest/SampleSizeCalculator.tsx
-  export function SampleSizeCalculator() {
-    const [inputs, setInputs] = useState({
-      baselineConversion: 5, // percentage
-      minimumEffect: 20, // percentage relative uplift
-      confidenceLevel: 95,
-      power: 80,
-      variations: 2,
-      dailyTraffic: 1000
+  import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+  import { motion } from 'framer-motion'
+  
+  interface SampleSizeInputs {
+    method: 'frequentist' | 'bayesian' | 'sequential' | 'mab'
+    metric: {
+      type: 'binary' | 'continuous'
+      baseline: number
+      variance?: number
+    }
+    effect: {
+      type: 'absolute' | 'relative'
+      value: number
+      practicalSignificance?: number
+    }
+    statisticalParams: {
+      confidenceLevel: number
+      power: number
+      testDirection: 'one-sided' | 'two-sided'
+      multipleComparisons?: number
+    }
+    traffic: {
+      daily: number
+      allocation: Record<string, number>
+      seasonality?: SeasonalityPattern
+      constraints?: {
+        maxDuration: number
+        maxBudget: number
+        costPerSample: number
+      }
+    }
+  }
+  
+  interface SeasonalityPattern {
+    dayOfWeek: number[] // 7 values representing multipliers
+    monthly: number[] // 12 values for months
+    holidays: { date: string; impact: number }[]
+  }
+  
+  export function SampleSizeCalculator({ 
+    onUpdate 
+  }: { 
+    onUpdate: (sampleSize: SampleSizeResult) => void 
+  }) {
+    const [inputs, setInputs] = useState<SampleSizeInputs>({
+      method: 'frequentist',
+      metric: {
+        type: 'binary',
+        baseline: 5,
+        variance: undefined
+      },
+      effect: {
+        type: 'relative',
+        value: 20,
+        practicalSignificance: 5
+      },
+      statisticalParams: {
+        confidenceLevel: 95,
+        power: 80,
+        testDirection: 'two-sided',
+        multipleComparisons: 1
+      },
+      traffic: {
+        daily: 1000,
+        allocation: { control: 50, variant: 50 },
+        seasonality: undefined,
+        constraints: undefined
+      }
     })
     
-    const sampleSize = calculateSampleSize(inputs)
-    const duration = Math.ceil(sampleSize.perVariation / inputs.dailyTraffic)
+    const results = useMemo(() => 
+      calculateSampleSizeWithMethod(inputs), [inputs]
+    )
+    
+    const powerCurveData = useMemo(() => 
+      generatePowerCurve(inputs), [inputs]
+    )
     
     return (
-      <div className="sample-size-calculator">
-        <h3 className="font-semibold mb-3">Sample Size Calculator</h3>
-        
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Input
-            label="Baseline Conversion Rate (%)"
-            type="number"
-            value={inputs.baselineConversion}
-            onChange={(e) => updateInput('baselineConversion', e.target.value)}
-          />
+      <div className="sample-size-calculator space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left Column: Inputs */}
+          <div className="space-y-4">
+            <MethodSelector
+              value={inputs.method}
+              onChange={(method) => setInputs({ ...inputs, method })}
+            />
+            
+            <MetricConfiguration
+              metric={inputs.metric}
+              onChange={(metric) => setInputs({ ...inputs, metric })}
+            />
+            
+            <EffectSizeInput
+              effect={inputs.effect}
+              baseline={inputs.metric.baseline}
+              onChange={(effect) => setInputs({ ...inputs, effect })}
+            />
+            
+            <StatisticalParameters
+              params={inputs.statisticalParams}
+              method={inputs.method}
+              onChange={(params) => setInputs({ ...inputs, statisticalParams: params })}
+            />
+            
+            <TrafficConfiguration
+              traffic={inputs.traffic}
+              onChange={(traffic) => setInputs({ ...inputs, traffic })}
+            />
+          </div>
           
-          <Input
-            label="Minimum Detectable Effect (%)"
-            type="number"
-            value={inputs.minimumEffect}
-            onChange={(e) => updateInput('minimumEffect', e.target.value)}
-          />
-          
-          <Select
-            label="Statistical Power"
-            value={inputs.power}
-            onChange={(e) => updateInput('power', e.target.value)}
-          >
-            <option value="80">80%</option>
-            <option value="90">90%</option>
-          </Select>
-          
-          <Input
-            label="Daily Traffic"
-            type="number"
-            value={inputs.dailyTraffic}
-            onChange={(e) => updateInput('dailyTraffic', e.target.value)}
-          />
+          {/* Right Column: Results */}
+          <div className="space-y-4">
+            <SampleSizeResults results={results} />
+            
+            <DurationEstimate
+              sampleSize={results.total}
+              traffic={inputs.traffic}
+              seasonality={inputs.traffic.seasonality}
+            />
+            
+            <CostAnalysis
+              sampleSize={results.total}
+              constraints={inputs.traffic.constraints}
+            />
+            
+            <PowerCurve data={powerCurveData} />
+          </div>
         </div>
         
-        <div className="results bg-gray-50 rounded-lg p-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-600">Per Variation</div>
-              <div className="text-2xl font-semibold">
-                {sampleSize.perVariation.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Total Sample</div>
-              <div className="text-2xl font-semibold">
-                {sampleSize.total.toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Est. Duration</div>
-              <div className="text-2xl font-semibold">
-                {duration} days
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Per Variation/Day</div>
-              <div className="text-2xl font-semibold">
-                {Math.floor(inputs.dailyTraffic / inputs.variations)}
-              </div>
-            </div>
+        <SensitivityAnalysis
+          baseInputs={inputs}
+          onScenarioSelect={(scenario) => setInputs(scenario)}
+        />
+      </div>
+    )
+  }
+  
+  function calculateSampleSizeWithMethod(
+    inputs: SampleSizeInputs
+  ): SampleSizeResult {
+    switch (inputs.method) {
+      case 'frequentist':
+        return calculateFrequentistSampleSize(inputs)
+      case 'bayesian':
+        return calculateBayesianSampleSize(inputs)
+      case 'sequential':
+        return calculateSequentialSampleSize(inputs)
+      case 'mab':
+        return calculateMABSampleSize(inputs)
+    }
+  }
+  
+  function calculateFrequentistSampleSize(inputs: SampleSizeInputs): SampleSizeResult {
+    const { metric, effect, statisticalParams } = inputs
+    
+    if (metric.type === 'binary') {
+      const p1 = metric.baseline / 100
+      const delta = effect.type === 'relative' 
+        ? effect.value / 100 
+        : effect.value / 100
+      const p2 = effect.type === 'relative' 
+        ? p1 * (1 + delta)
+        : p1 + delta
+      
+      const alpha = 1 - statisticalParams.confidenceLevel / 100
+      const beta = 1 - statisticalParams.power / 100
+      
+      // Adjust for multiple comparisons
+      const adjustedAlpha = statisticalParams.multipleComparisons 
+        ? alpha / statisticalParams.multipleComparisons
+        : alpha
+      
+      const zAlpha = statisticalParams.testDirection === 'two-sided'
+        ? inv(1 - adjustedAlpha/2, 'normal')
+        : inv(1 - adjustedAlpha, 'normal')
+      const zBeta = inv(1 - beta, 'normal')
+      
+      const pooled = (p1 + p2) / 2
+      
+      const n = Math.ceil(
+        2 * Math.pow(zAlpha + zBeta, 2) * pooled * (1 - pooled) / 
+        Math.pow(p2 - p1, 2)
+      )
+      
+      // Adjust for unequal allocation
+      const allocationRatio = Object.values(inputs.traffic.allocation)
+      const adjustedN = adjustUnequelAllocation(n, allocationRatio)
+      
+      return {
+        perVariation: adjustedN,
+        total: adjustedN * Object.keys(inputs.traffic.allocation).length,
+        powerAchieved: statisticalParams.power,
+        notes: [
+          statisticalParams.multipleComparisons > 1 
+            ? `Adjusted for ${statisticalParams.multipleComparisons} comparisons`
+            : null,
+          allocationRatio.some(r => r !== allocationRatio[0])
+            ? 'Adjusted for unequal traffic allocation'
+            : null
+        ].filter(Boolean)
+      }
+    } else {
+      // Continuous metric calculation
+      // Implementation for t-test sample size
+    }
+  }
+  ```
+
+#### Ticket 3.4.4: Advanced Results Visualization
+- **Description:** Build comprehensive interactive visualizations for test results
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Test timeline visualization:
+    - Daily/hourly metric trends
+    - Cumulative results over time
+    - Annotations for events and changes
+    - Statistical significance evolution
+    - Sample size accumulation
+  - Statistical visualizations:
+    - Conversion rates with confidence/credible intervals
+    - Posterior distributions (Bayesian)
+    - Sequential testing boundaries
+    - P-value evolution
+    - Effect size with practical significance zones
+  - Comparison visualizations:
+    - Forest plots for multiple variants
+    - Uplift distributions
+    - Winner probability over time
+    - Risk vs reward scatter plots
+  - Segment analysis:
+    - Performance by user segments
+    - Device/browser breakdowns
+    - Geographic performance
+    - Time-of-day patterns
+  - Interactive features:
+    - Hover for detailed stats
+    - Click to drill down
+    - Zoom and pan on timeline
+    - Filter by date range
+    - Toggle between metrics
+  - Export capabilities:
+    - Export charts as PNG/SVG
+    - Download raw data
+    - Generate presentation slides
+  - Mobile responsive design
+- **Dependencies:** 3.4.2
+- **Implementation Notes:**
+  ```typescript
+  // src/components/widgets/abtest/TestResultsVisualization.tsx
+  import { 
+    LineChart, Line, AreaChart, Area, BarChart, Bar,
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+    ResponsiveContainer, ReferenceLine, ReferenceArea
+  } from 'recharts'
+  import { motion, AnimatePresence } from 'framer-motion'
+  
+  interface TestResultsVisualizationProps {
+    test: AbTest
+    results: TestResults
+    timeSeriesData?: TimeSeriesData[]
+    segmentData?: SegmentAnalysis
+  }
+  
+  export function TestResultsVisualization({
+    test,
+    results,
+    timeSeriesData,
+    segmentData
+  }: TestResultsVisualizationProps) {
+    const [activeView, setActiveView] = useState<
+      'timeline' | 'statistical' | 'segments' | 'comparison'
+    >('timeline')
+    const [selectedMetric, setSelectedMetric] = useState(test.config.metric)
+    const [dateRange, setDateRange] = useState<[Date, Date]>([
+      test.metadata.startDate,
+      new Date()
+    ])
+    
+    return (
+      <div className="test-results-visualization space-y-6">
+        {/* View Selector */}
+        <div className="flex items-center justify-between">
+          <ViewSelector
+            active={activeView}
+            onChange={setActiveView}
+            options={[
+              { value: 'timeline', label: 'Timeline', icon: TimelineIcon },
+              { value: 'statistical', label: 'Statistical', icon: StatsIcon },
+              { value: 'segments', label: 'Segments', icon: SegmentIcon },
+              { value: 'comparison', label: 'Comparison', icon: CompareIcon }
+            ]}
+          />
+          
+          <div className="flex items-center gap-4">
+            <MetricSelector
+              value={selectedMetric}
+              onChange={setSelectedMetric}
+              availableMetrics={getAvailableMetrics(test)}
+            />
+            
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              min={test.metadata.startDate}
+              max={new Date()}
+            />
+            
+            <ExportMenu
+              onExport={(format) => handleExport(format, activeView)}
+            />
+          </div>
+        </div>
+        
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeView}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeView === 'timeline' && (
+              <TimelineView
+                data={timeSeriesData}
+                results={results}
+                metric={selectedMetric}
+                dateRange={dateRange}
+                test={test}
+              />
+            )}
+            
+            {activeView === 'statistical' && (
+              <StatisticalView
+                results={results}
+                test={test}
+                metric={selectedMetric}
+              />
+            )}
+            
+            {activeView === 'segments' && (
+              <SegmentAnalysisView
+                data={segmentData}
+                test={test}
+                metric={selectedMetric}
+              />
+            )}
+            
+            {activeView === 'comparison' && (
+              <ComparisonView
+                test={test}
+                results={results}
+                metric={selectedMetric}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    )
+  }
+  
+  // Timeline View Component
+  function TimelineView({ data, results, metric, dateRange, test }) {
+    const chartData = processTimeSeriesData(data, metric, dateRange)
+    const annotations = getTestAnnotations(test)
+    
+    return (
+      <div className="timeline-view space-y-6">
+        {/* Cumulative Conversion Rate */}
+        <ChartCard title="Cumulative Performance">
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(date) => format(new Date(date), 'MMM d')}
+              />
+              <YAxis />
+              <Tooltip
+                content={<CustomTooltip />}
+                formatter={(value) => formatMetric(value, metric)}
+              />
+              <Legend />
+              
+              {test.variations.map((variation, index) => (
+                <Line
+                  key={variation.id}
+                  type="monotone"
+                  dataKey={`${variation.id}_rate`}
+                  name={variation.name}
+                  stroke={getVariationColor(index)}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              ))}
+              
+              {/* Confidence intervals */}
+              {test.variations.slice(1).map((variation, index) => (
+                <Area
+                  key={`${variation.id}_ci`}
+                  type="monotone"
+                  dataKey={`${variation.id}_ci_upper`}
+                  dataKey2={`${variation.id}_ci_lower`}
+                  fill={getVariationColor(index + 1)}
+                  fillOpacity={0.1}
+                  stroke="none"
+                />
+              ))}
+              
+              {/* Annotations */}
+              {annotations.map((annotation, index) => (
+                <ReferenceLine
+                  key={index}
+                  x={annotation.date}
+                  stroke="#666"
+                  strokeDasharray="3 3"
+                  label={<AnnotationLabel text={annotation.text} />}
+                />
+              ))}
+              
+              {/* Significance regions */}
+              {getSignificanceRegions(chartData, results).map((region, index) => (
+                <ReferenceArea
+                  key={index}
+                  x1={region.start}
+                  x2={region.end}
+                  fill="#10b981"
+                  fillOpacity={0.1}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        
+        {/* Daily Results */}
+        <ChartCard title="Daily Performance">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={getDailyData(chartData)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              
+              {test.variations.map((variation, index) => (
+                <Bar
+                  key={variation.id}
+                  dataKey={`${variation.id}_daily`}
+                  name={variation.name}
+                  fill={getVariationColor(index)}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        
+        {/* Statistical Significance Evolution */}
+        <ChartCard title="Statistical Significance Over Time">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis 
+                domain={[0, 1]}
+                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+              />
+              <Tooltip
+                formatter={(value) => `p-value: ${value.toFixed(4)}`}
+              />
+              
+              <ReferenceLine 
+                y={0.05} 
+                stroke="#ef4444" 
+                strokeDasharray="3 3"
+                label="α = 0.05"
+              />
+              
+              {test.variations.slice(1).map((variation, index) => (
+                <Line
+                  key={variation.id}
+                  type="monotone"
+                  dataKey={`${variation.id}_pvalue`}
+                  name={`${variation.name} p-value`}
+                  stroke={getVariationColor(index + 1)}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    )
+  }
+  ```
+
+#### Ticket 3.4.5: Test Planning & Power Analysis
+- **Description:** Build comprehensive test planning tools with power analysis
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Interactive power curve visualization:
+    - Show power vs sample size
+    - Power vs effect size
+    - Multiple comparison adjustments
+    - Interactive tooltips
+  - MDE (Minimum Detectable Effect) calculator:
+    - Given sample size, what effect can be detected
+    - Business impact modeling
+    - ROI of different effect sizes
+  - Runtime estimation:
+    - Traffic allocation scenarios
+    - Seasonality impact on duration
+    - Early stopping probability
+  - Budget calculator:
+    - Cost per test participant
+    - Opportunity cost of testing
+    - Expected value calculations
+  - Risk assessment:
+    - Type I error (false positives)
+    - Type II error (false negatives)
+    - Business risk quantification
+    - Decision framework
+- **Dependencies:** 3.4.3
+- **Implementation Notes:**
+  ```typescript
+  // src/components/widgets/abtest/TestPlanning.tsx
+  export function TestPlanning({ 
+    onPlanUpdate 
+  }: { 
+    onPlanUpdate: (plan: TestPlan) => void 
+  }) {
+    const [planningMode, setPlanningMode] = useState<'power' | 'mde' | 'budget'>('power')
+    
+    return (
+      <div className="test-planning space-y-6">
+        <ModeTabs
+          active={planningMode}
+          onChange={setPlanningMode}
+          tabs={[
+            { id: 'power', label: 'Power Analysis', icon: PowerIcon },
+            { id: 'mde', label: 'MDE Calculator', icon: TargetIcon },
+            { id: 'budget', label: 'Budget & Risk', icon: BudgetIcon }
+          ]}
+        />
+        
+        {planningMode === 'power' && (
+          <PowerAnalysis onUpdate={handlePowerUpdate} />
+        )}
+        
+        {planningMode === 'mde' && (
+          <MDECalculator onUpdate={handleMDEUpdate} />
+        )}
+        
+        {planningMode === 'budget' && (
+          <BudgetRiskAnalysis onUpdate={handleBudgetUpdate} />
+        )}
+      </div>
+    )
+  }
+  
+  function PowerAnalysis({ onUpdate }) {
+    const [inputs, setInputs] = useState({
+      baselineRate: 5,
+      sampleSizeRange: [100, 10000],
+      effectSizeRange: [5, 50],
+      alpha: 0.05,
+      testType: 'two-sided'
+    })
+    
+    const powerCurveData = useMemo(() => 
+      generatePowerCurves(inputs), [inputs]
+    )
+    
+    return (
+      <div className="power-analysis">
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <PowerInputs
+              inputs={inputs}
+              onChange={setInputs}
+            />
+            
+            <InterpretationGuide
+              power={calculateCurrentPower(inputs)}
+            />
+          </div>
+          
+          <div className="space-y-4">
+            <ChartCard title="Power Curves">
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={powerCurveData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="sampleSize"
+                    label={{ value: 'Sample Size per Variation', position: 'insideBottom', offset: -5 }}
+                  />
+                  <YAxis 
+                    domain={[0, 1]}
+                    tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+                    label={{ value: 'Statistical Power', angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip
+                    formatter={(value) => `${(value * 100).toFixed(1)}%`}
+                  />
+                  <Legend />
+                  
+                  <ReferenceLine 
+                    y={0.8} 
+                    stroke="#10b981" 
+                    strokeDasharray="3 3"
+                    label="80% Power"
+                  />
+                  
+                  {[10, 20, 30, 50].map(effect => (
+                    <Line
+                      key={effect}
+                      type="monotone"
+                      dataKey={`power_${effect}`}
+                      name={`${effect}% Effect`}
+                      stroke={getEffectColor(effect)}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            
+            <RecommendationsCard
+              inputs={inputs}
+              targetPower={0.8}
+            />
           </div>
         </div>
       </div>
     )
   }
-  
-  function calculateSampleSize(inputs: SampleSizeInputs): {
-    perVariation: number
-    total: number
-  } {
-    const { baselineConversion, minimumEffect, confidenceLevel, power } = inputs
-    
-    const p1 = baselineConversion / 100
-    const delta = minimumEffect / 100
-    const p2 = p1 * (1 + delta)
-    
-    const alpha = 1 - confidenceLevel / 100
-    const beta = 1 - power / 100
-    
-    const zAlpha = inv(1 - alpha/2, 'normal')
-    const zBeta = inv(1 - beta, 'normal')
-    
-    const pooled = (p1 + p2) / 2
-    
-    const n = Math.ceil(
-      2 * Math.pow(zAlpha + zBeta, 2) * pooled * (1 - pooled) / 
-      Math.pow(p2 - p1, 2)
-    )
-    
-    return {
-      perVariation: n,
-      total: n * inputs.variations
-    }
-  }
   ```
 
-#### Ticket 3.4.4: Create Test Results Visualization
-- **Description:** Build visual representation of A/B test results
+#### Ticket 3.4.6: Test Templates & Benchmarks
+- **Description:** Create industry-specific templates and benchmarks for common test scenarios
 - **Story Points:** 1 SP
 - **Technical Requirements:**
-  - Show conversion rates with error bars
-  - Display significance indicators
-  - Visualize confidence intervals
-  - Color code winning/losing variations
-  - Add result interpretation text
-- **Dependencies:** 3.4.2
+  - Industry templates:
+    - E-commerce (cart, checkout, product page)
+    - SaaS (onboarding, pricing, features)
+    - Mobile apps (install, engagement, retention)
+    - Content sites (engagement, subscriptions)
+    - B2B (lead gen, demo requests)
+  - Common hypotheses library:
+    - UI/UX changes
+    - Pricing experiments
+    - Feature rollouts
+    - Content variations
+    - Messaging tests
+  - Benchmark data:
+    - Typical conversion rates by industry
+    - Expected effect sizes
+    - Test success rates
+    - Duration benchmarks
+  - Best practices:
+    - Pre-test checklists
+    - Common pitfalls
+    - Success factors
+    - Post-test actions
+- **Dependencies:** 3.4.1
 - **Implementation Notes:**
   ```typescript
-  // src/components/widgets/abtest/TestResultsDisplay.tsx
-  export function TestResultsDisplay({ 
-    variations, 
-    results 
+  // src/lib/templates/abTestTemplates.ts
+  export const AB_TEST_TEMPLATES: TestTemplate[] = [
+    {
+      id: 'ecommerce-checkout',
+      name: 'E-commerce Checkout Optimization',
+      category: 'ecommerce',
+      description: 'Optimize checkout flow to reduce cart abandonment',
+      defaultConfig: {
+        metric: 'conversion',
+        secondaryMetrics: ['revenue', 'cart_abandonment'],
+        minimumEffect: 10,
+        confidenceLevel: 95,
+        power: 80
+      },
+      hypothesis: {
+        template: 'By {change}, we expect to {impact} because {reason}',
+        examples: [
+          'By reducing checkout steps from 4 to 2, we expect to increase conversion by 15% because users will experience less friction',
+          'By adding trust badges, we expect to reduce cart abandonment by 10% because users will feel more secure'
+        ]
+      },
+      benchmarks: {
+        baselineConversion: { min: 2, avg: 3.5, max: 5 },
+        typicalUplift: { min: 5, avg: 12, max: 25 },
+        testDuration: { min: 14, avg: 21, max: 35 }
+      },
+      checklist: [
+        'Ensure tracking is properly set up for all steps',
+        'Consider mobile vs desktop separately',
+        'Account for payment method variations',
+        'Monitor for increased fraud'
+      ]
+    }
+  ]
+  ```
+
+#### Ticket 3.4.7: History & Comparison
+- **Description:** Build test history tracking and comparison features
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Test history management:
+    - Save complete test results
+    - Track test metadata
+    - Version control for test configs
+    - Archive old tests
+  - Search and filtering:
+    - By date range
+    - By test status
+    - By metric type
+    - By winning variation
+    - By team/owner
+  - Comparison features:
+    - Compare multiple tests
+    - Meta-analysis across tests
+    - Learning extraction
+    - Pattern identification
+  - Learning repository:
+    - Document insights
+    - Tag successful patterns
+    - Track failure reasons
+    - Build knowledge base
+  - Analytics:
+    - Test velocity tracking
+    - Success rate trends
+    - Average uplift by category
+    - ROI of testing program
+- **Dependencies:** 3.4.1, 3.4.2
+- **Implementation Notes:**
+  ```typescript
+  // src/components/widgets/abtest/TestHistory.tsx
+  export function TestHistory({ 
+    onLoadTest,
+    onCompareTests 
   }: {
-    variations: Variation[]
-    results: TestResult[]
+    onLoadTest: (test: SavedTest) => void
+    onCompareTests: (tests: SavedTest[]) => void
   }) {
-    const control = variations[0]
-    const hasWinner = results.some(r => r.isSignificant && r.uplift > 0)
+    const [testHistory, setTestHistory] = useStorage<SavedTest[]>("abtest-history", [])
+    const [filters, setFilters] = useState<TestFilters>({
+      dateRange: 'all',
+      status: 'all',
+      metric: 'all',
+      winner: 'all'
+    })
+    const [selectedTests, setSelectedTests] = useState<Set<string>>(new Set())
+    const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list')
+    
+    const filteredTests = useMemo(() => 
+      applyFilters(testHistory, filters), [testHistory, filters]
+    )
+    
+    const analytics = useMemo(() => 
+      calculateTestingAnalytics(testHistory), [testHistory]
+    )
     
     return (
-      <div className="test-results">
-        <div className="mb-4">
-          <h3 className="font-semibold">Test Results</h3>
-          {hasWinner ? (
-            <p className="text-green-600">
-              ✓ Statistically significant winner found!
-            </p>
-          ) : (
-            <p className="text-gray-600">
-              No significant difference detected yet
-            </p>
-          )}
-        </div>
-        
-        <div className="space-y-3">
-          {variations.map((variation, index) => {
-            const result = index === 0 ? null : results[index - 1]
-            const conversionRate = variation.conversions / variation.visitors * 100
+      <div className="test-history">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold">Test History</h3>
+          
+          <div className="flex items-center gap-4">
+            <SearchInput
+              placeholder="Search tests..."
+              onChange={handleSearch}
+            />
             
-            return (
-              <VariationResult
-                key={variation.id}
-                variation={variation}
-                conversionRate={conversionRate}
-                result={result}
-                isControl={index === 0}
-                isWinner={result?.isSignificant && result?.uplift > 0}
-              />
-            )
-          })}
+            <FilterDropdown
+              filters={filters}
+              onChange={setFilters}
+            />
+            
+            <ViewToggle
+              value={viewMode}
+              onChange={setViewMode}
+            />
+          </div>
         </div>
         
-        <ConfidenceIntervalChart
-          variations={variations}
-          results={results}
-        />
+        {viewMode === 'list' ? (
+          <TestList
+            tests={filteredTests}
+            selectedTests={selectedTests}
+            onSelectTest={handleSelectTest}
+            onLoadTest={onLoadTest}
+            onCompareTests={() => onCompareTests(getSelectedTests())}
+          />
+        ) : (
+          <TestingAnalytics
+            analytics={analytics}
+            tests={testHistory}
+          />
+        )}
         
-        <ResultInterpretation
-          results={results}
-          sampleSize={variations.reduce((sum, v) => sum + v.visitors, 0)}
+        <LearningRepository
+          tests={testHistory}
+          onAddInsight={handleAddInsight}
         />
       </div>
     )
+  }
+  ```
+
+#### Ticket 3.4.8: Export & Reporting
+- **Description:** Add comprehensive export and reporting capabilities
+- **Story Points:** 1 SP
+- **Technical Requirements:**
+  - Export formats:
+    - CSV with all raw data
+    - JSON for data portability
+    - PDF executive summary
+    - PowerPoint presentation
+  - Report templates:
+    - Executive summary
+    - Technical deep dive
+    - Stakeholder update
+    - Learning document
+  - Auto-generated content:
+    - Key findings
+    - Recommendations
+    - Next steps
+    - Methodology section
+  - Sharing features:
+    - Generate shareable URL
+    - Email reports
+    - Slack integration
+    - API endpoints
+  - Customization:
+    - Company branding
+    - Custom templates
+    - Selective data export
+- **Dependencies:** 3.4.4
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/export/abTestExport.ts
+  export async function exportTestResults(
+    test: AbTest,
+    results: TestResults,
+    format: 'csv' | 'json' | 'pdf' | 'pptx',
+    options: ExportOptions = {}
+  ): Promise<void> {
+    switch (format) {
+      case 'csv':
+        return exportToCSV(test, results, options)
+      case 'json':
+        return exportToJSON(test, results, options)
+      case 'pdf':
+        return exportToPDF(test, results, options)
+      case 'pptx':
+        return exportToPowerPoint(test, results, options)
+    }
+  }
+  
+  async function exportToPDF(
+    test: AbTest,
+    results: TestResults,
+    options: ExportOptions
+  ): Promise<void> {
+    const doc = await generatePDF({
+      title: `A/B Test Report: ${test.metadata.name}`,
+      subtitle: `${test.metadata.hypothesis}`,
+      date: new Date(),
+      branding: options.branding,
+      sections: [
+        {
+          title: 'Executive Summary',
+          content: generateExecutiveSummary(test, results)
+        },
+        {
+          title: 'Test Results',
+          type: 'results',
+          data: {
+            winner: results.winner,
+            confidence: results.confidence,
+            uplift: results.uplift,
+            significance: results.isSignificant
+          }
+        },
+        {
+          title: 'Statistical Analysis',
+          type: 'charts',
+          charts: [
+            generateConversionChart(test, results),
+            generateConfidenceIntervalChart(test, results),
+            generateTimelineChart(test, results)
+          ]
+        },
+        {
+          title: 'Methodology',
+          content: generateMethodologySection(test)
+        },
+        {
+          title: 'Recommendations',
+          content: generateRecommendations(test, results)
+        },
+        {
+          title: 'Appendix',
+          subsections: [
+            { title: 'Raw Data', type: 'table', data: getRawData(test) },
+            { title: 'Statistical Details', content: getStatDetails(results) }
+          ]
+        }
+      ]
+    })
+    
+    doc.save(`ab-test-${test.metadata.name}-${Date.now()}.pdf`)
   }
   ```
 
@@ -3150,9 +4502,12 @@ Implement a comprehensive suite of Product Management calculators as widgets for
 ### Deliverables:
 - ✅ RICE Score Calculator with visualization and export
 - ✅ TAM/SAM/SOM Calculator with multiple calculation methods
-- ✅ ROI Calculator with NPV, IRR, and timeline views
-- ✅ A/B Test Calculator with statistical significance testing
+- ✅ ROI Calculator with advanced metrics, risk assessment, and scenario analysis
+- 🔲 A/B Test Calculator with statistical significance testing
 - ✅ Reusable calculation utilities and components
+- ⏳ Industry templates and benchmarks (partial implementation)
+- ✅ Comprehensive validation and help systems
+- ✅ Export to multiple formats (CSV, JSON, PDF) with sharing capabilities
 
 ### Key Milestones:
 1. **Calculator Framework Ready** - Base components and utilities complete

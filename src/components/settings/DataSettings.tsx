@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button, Card } from "~/components/common"
 import { useDashboardLayout } from "~/hooks/useDashboardLayout"
 import { formatBytes, getStorageQuota } from "~/lib/storage/storageManager"
@@ -15,10 +15,10 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
   const [storageInfo, setStorageInfo] = useState<{ bytesInUse: number; quota: number } | null>(null)
 
   // Get storage usage info
-  const loadStorageInfo = async () => {
+  const loadStorageInfo = useCallback(async () => {
     const info = await getStorageQuota("local")
     setStorageInfo(info)
-  }
+  }, [])
 
   // Clear all extension data
   const handleClearAllData = async () => {
@@ -58,10 +58,9 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
     }
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadStorageInfo()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [loadStorageInfo])
 
   const handleLayoutRestore = (newLayout: WidgetConfig[]) => {
     if (newLayout.length === 0) {
@@ -118,13 +117,8 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
               Remove cached feed data to free up space. Your settings will be preserved.
             </p>
             <Button onClick={handleClearCache} variant="secondary">
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-label="Clear cache"
-              >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <title>Clear cache</title>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -143,13 +137,8 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
               This action cannot be undone.
             </p>
             <Button onClick={handleClearAllData} variant="danger" disabled={clearingData}>
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-label="Warning"
-              >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <title>Warning</title>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -176,8 +165,8 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
                 className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
-                aria-label="Check"
               >
+                <title>Check</title>
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -191,8 +180,8 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
                 className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
-                aria-label="Check"
               >
+                <title>Check</title>
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -206,8 +195,8 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
                 className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
-                aria-label="Check"
               >
+                <title>Check</title>
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -221,8 +210,8 @@ export function DataSettings({ onLayoutRestore }: DataSettingsProps) {
                 className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
-                aria-label="Check"
               >
+                <title>Check</title>
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
