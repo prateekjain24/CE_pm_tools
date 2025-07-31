@@ -56,6 +56,14 @@ export type MessageRequest =
   | { type: "SAVE_DASHBOARD_LAYOUT"; layout: unknown }
   | { type: "GET_DASHBOARD_LAYOUT" }
   | { type: "RESET_DASHBOARD_LAYOUT" }
+  | { type: "FOCUS_WIDGET"; widgetId: string }
+
+  // Navigation operations
+  | {
+      type: "NAVIGATE_TO"
+      destination: "dashboard" | "settings" | "calculator"
+      params?: Record<string, string>
+    }
 
   // API Key operations
   | {
@@ -134,6 +142,10 @@ export type MessageResponses = {
   SAVE_DASHBOARD_LAYOUT: MessageResponse<void>
   GET_DASHBOARD_LAYOUT: MessageResponse<unknown>
   RESET_DASHBOARD_LAYOUT: MessageResponse<void>
+  FOCUS_WIDGET: MessageResponse<void>
+
+  // Navigation responses
+  NAVIGATE_TO: MessageResponse<void>
 
   // API Key responses
   TEST_API_CONNECTION: MessageResponse<{ isValid: boolean; message?: string }>

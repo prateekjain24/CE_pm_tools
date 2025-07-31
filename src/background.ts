@@ -1,4 +1,5 @@
 import { Storage } from "@plasmohq/storage"
+import { navigation } from "~/lib/navigation"
 import { DEFAULT_USER_SETTINGS } from "~/types"
 import type { MessageRequest, MessageResponse } from "~/types/messages"
 import { createErrorResponse, createSuccessResponse, isMessageRequest } from "~/types/messages"
@@ -92,6 +93,29 @@ chrome.runtime.onMessage.addListener(
           })
         return true // Keep message channel open for async response
 
+      case "NAVIGATE_TO":
+        // Handle navigation requests
+        handleNavigation(request)
+          .then(() => {
+            sendResponse(createSuccessResponse(undefined))
+          })
+          .catch((error) => {
+            sendResponse(createErrorResponse(error.message))
+          })
+        return true
+
+      case "FOCUS_WIDGET":
+        // Forward to all dashboard tabs
+        chrome.tabs.query({ url: chrome.runtime.getURL("tabs/newtab.html*") }, (tabs) => {
+          tabs.forEach((tab) => {
+            if (tab.id) {
+              chrome.tabs.sendMessage(tab.id, request)
+            }
+          })
+          sendResponse(createSuccessResponse(undefined))
+        })
+        return true
+
       default:
         sendResponse(createErrorResponse("Unknown message type"))
     }
@@ -102,6 +126,28 @@ chrome.runtime.onMessage.addListener(
 chrome.runtime.onUpdateAvailable.addListener((details) => {
   console.log("Update available:", details.version)
   // Could show notification to user about available update
+})
+
+// Handle keyboard shortcuts
+chrome.commands.onCommand.addListener(async (command) => {
+  console.log("Command received:", command)
+
+  switch (command) {
+    case "open-dashboard":
+      await navigation.openDashboard()
+      break
+    case "quick-rice":
+      await navigation.openCalculator("rice-calculator")
+      break
+    case "quick-tam":
+      await navigation.openCalculator("tam-calculator")
+      break
+    case "open-settings":
+      await navigation.openSettings()
+      break
+    default:
+      console.warn("Unknown command:", command)
+  }
 })
 
 // API Connection Testing
@@ -207,5 +253,26 @@ async function testApiConnection(
       isValid: false,
       message: error instanceof Error ? error.message : "Connection test failed",
     }
+  }
+}
+
+// Handle navigation requests
+async function handleNavigation(request: Extract<MessageRequest, { type: "NAVIGATE_TO" }>) {
+  const { destination, params } = request
+
+  switch (destination) {
+    case "dashboard":
+      await navigation.openDashboard(params)
+      break
+    case "settings":
+      await navigation.openSettings(params?.section)
+      break
+    case "calculator":
+      if (params?.type) {
+        await navigation.openCalculator(params.type)
+      }
+      break
+    default:
+      throw new Error(`Unknown navigation destination: ${destination}`)
   }
 }

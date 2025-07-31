@@ -7,9 +7,16 @@ import { WidgetSettings } from "./WidgetSettings"
 interface DashboardGridProps {
   layout: WidgetConfig[]
   onLayoutChange: (layout: WidgetConfig[]) => void
+  activeCalculator?: string | null
+  widgetRefs?: React.MutableRefObject<{ [key: string]: HTMLElement | null }>
 }
 
-export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
+export function DashboardGrid({
+  layout,
+  onLayoutChange,
+  activeCalculator,
+  widgetRefs,
+}: DashboardGridProps) {
   const gridRef = useRef<HTMLDivElement>(null)
   const [isClient, setIsClient] = useState(false)
   const [screenWidth, setScreenWidth] = useState(1200)
@@ -65,7 +72,13 @@ export function DashboardGrid({ layout, onLayoutChange }: DashboardGridProps) {
       {visibleWidgets.map((widget) => (
         <WidgetContainer
           key={widget.id}
+          ref={(el) => {
+            if (widgetRefs) {
+              widgetRefs.current[widget.id] = el
+            }
+          }}
           widget={widget}
+          activeCalculator={activeCalculator}
           onRemove={() => {
             // Remove widget completely
             const updatedLayout = layout.filter((w) => w.id !== widget.id)

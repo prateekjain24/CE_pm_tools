@@ -132,19 +132,28 @@ export default function Popup() {
             Quick Calculators
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            {filteredCalculators.map((calc) => (
-              <QuickActionCard
-                key={calc.id}
-                id={calc.id}
-                title={calc.name}
-                description={calc.description}
-                icon={calc.icon}
-                onClick={() => handleCalculatorClick(calc.id)}
-                usageCount={calc.usageCount}
-                isNew={calc.isNew}
-                isPro={calc.isPro}
-              />
-            ))}
+            {filteredCalculators.map((calc) => {
+              // Map calculator shortcuts
+              const shortcuts: Record<string, { key: string; ctrl?: boolean; shift?: boolean }> = {
+                "rice-calculator": { key: "r", ctrl: true, shift: true },
+                "tam-calculator": { key: "t", ctrl: true, shift: true },
+              }
+
+              return (
+                <QuickActionCard
+                  key={calc.id}
+                  id={calc.id}
+                  title={calc.name}
+                  description={calc.description}
+                  icon={calc.icon}
+                  onClick={() => handleCalculatorClick(calc.id)}
+                  usageCount={calc.usageCount}
+                  isNew={calc.isNew}
+                  isPro={calc.isPro}
+                  shortcut={shortcuts[calc.id]}
+                />
+              )
+            })}
           </div>
         </div>
 

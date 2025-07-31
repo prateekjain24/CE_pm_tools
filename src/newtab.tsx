@@ -1,15 +1,78 @@
 import "~/styles/globals.css"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { DashboardGrid } from "~/components/dashboard/DashboardGrid"
 import { EmptyState } from "~/components/dashboard/EmptyState"
 import { HiddenWidgetsDrawer } from "~/components/dashboard/HiddenWidgetsDrawer"
+import { KeyboardShortcuts } from "~/components/help/KeyboardShortcuts"
 import { DashboardHeader } from "~/components/layout/DashboardHeader"
 import { useDashboardLayout } from "~/hooks/useDashboardLayout"
+import { useKeyboardShortcuts } from "~/hooks/useKeyboardShortcuts"
 import type { WidgetConfig } from "~/types"
 
 export default function NewTab() {
   const { layout, updateWidget, showWidget } = useDashboardLayout()
   const [showHiddenDrawer, setShowHiddenDrawer] = useState(false)
+  const [activeCalculator, setActiveCalculator] = useState<string | null>(null)
+  const [_focusedWidget, setFocusedWidget] = useState<string | null>(null)
+  const widgetRefs = useRef<{ [key: string]: HTMLElement | null }>({})
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts()
+
+  // Handle URL parameters on mount and changes
+  useEffect(() => {
+    const handleUrlParams = () => {
+      const params = new URLSearchParams(window.location.search)
+      const calculator = params.get("calculator")
+      const widget = params.get("widget")
+
+      if (calculator) {
+        setActiveCalculator(calculator)
+      }
+
+      if (widget) {
+        setFocusedWidget(widget)
+        // Scroll to widget after a short delay to ensure rendering
+        setTimeout(() => {
+          const widgetElement = widgetRefs.current[widget]
+          if (widgetElement) {
+            widgetElement.scrollIntoView({ behavior: "smooth", block: "center" })
+            // Add a highlight effect
+            widgetElement.classList.add("ring-2", "ring-blue-500", "ring-opacity-50")
+            setTimeout(() => {
+              widgetElement.classList.remove("ring-2", "ring-blue-500", "ring-opacity-50")
+            }, 2000)
+          }
+        }, 100)
+      }
+    }
+
+    handleUrlParams()
+
+    // Listen for popstate events (browser back/forward)
+    window.addEventListener("popstate", handleUrlParams)
+
+    // Listen for messages to focus widgets
+    const handleMessage = (request: { type: string; widgetId?: string }) => {
+      if (request.type === "FOCUS_WIDGET" && request.widgetId) {
+        const widgetElement = widgetRefs.current[request.widgetId]
+        if (widgetElement) {
+          widgetElement.scrollIntoView({ behavior: "smooth", block: "center" })
+          widgetElement.classList.add("ring-2", "ring-blue-500", "ring-opacity-50")
+          setTimeout(() => {
+            widgetElement.classList.remove("ring-2", "ring-blue-500", "ring-opacity-50")
+          }, 2000)
+        }
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(handleMessage)
+
+    return () => {
+      window.removeEventListener("popstate", handleUrlParams)
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [])
 
   const handleLayoutChange = (newLayout: WidgetConfig[]) => {
     // For now, we'll update widgets individually
@@ -48,7 +111,12 @@ export default function NewTab() {
 
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           {layout && layout.length > 0 ? (
-            <DashboardGrid layout={layout} onLayoutChange={handleLayoutChange} />
+            <DashboardGrid
+              layout={layout}
+              onLayoutChange={handleLayoutChange}
+              activeCalculator={activeCalculator}
+              widgetRefs={widgetRefs}
+            />
           ) : (
             <EmptyState />
           )}
@@ -68,6 +136,9 @@ export default function NewTab() {
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/50 to-transparent dark:from-black/20" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white/50 to-transparent dark:from-black/20" />
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcuts />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { ShortcutHint } from "~/components/common/ShortcutHint"
 
 interface QuickActionCardProps {
   id: string
@@ -10,6 +11,12 @@ interface QuickActionCardProps {
   isNew?: boolean
   isPro?: boolean
   className?: string
+  shortcut?: {
+    key: string
+    ctrl?: boolean
+    shift?: boolean
+    alt?: boolean
+  }
 }
 
 export function QuickActionCard({
@@ -21,6 +28,7 @@ export function QuickActionCard({
   isNew,
   isPro,
   className = "",
+  shortcut,
 }: QuickActionCardProps) {
   return (
     <button
@@ -52,10 +60,19 @@ export function QuickActionCard({
       )}
 
       {/* Content */}
-      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">{title}</h3>
-      {description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{description}</p>
-      )}
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">{title}</h3>
+          {description && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{description}</p>
+          )}
+        </div>
+        {shortcut && (
+          <div className="ml-2 mt-0.5">
+            <ShortcutHint shortcut={shortcut} size="sm" />
+          </div>
+        )}
+      </div>
 
       {/* Usage indicator */}
       {usageCount !== undefined && usageCount > 0 && (
