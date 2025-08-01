@@ -3,15 +3,17 @@ import { useEffect, useRef, useState } from "react"
 import { DashboardGrid } from "~/components/dashboard/DashboardGrid"
 import { EmptyState } from "~/components/dashboard/EmptyState"
 import { HiddenWidgetsDrawer } from "~/components/dashboard/HiddenWidgetsDrawer"
+import { WidgetPicker } from "~/components/dashboard/WidgetPicker"
 import { KeyboardShortcuts } from "~/components/help/KeyboardShortcuts"
 import { DashboardHeader } from "~/components/layout/DashboardHeader"
 import { useDashboardLayout } from "~/hooks/useDashboardLayout"
 import { useKeyboardShortcuts } from "~/hooks/useKeyboardShortcuts"
-import type { WidgetConfig } from "~/types"
+import type { WidgetConfig, WidgetType } from "~/types"
 
 export default function NewTab() {
-  const { layout, updateWidget, showWidget } = useDashboardLayout()
+  const { layout, updateWidget, showWidget, addWidget } = useDashboardLayout()
   const [showHiddenDrawer, setShowHiddenDrawer] = useState(false)
+  const [showWidgetPicker, setShowWidgetPicker] = useState(false)
   const [activeCalculator, setActiveCalculator] = useState<string | null>(null)
   const [_focusedWidget, setFocusedWidget] = useState<string | null>(null)
   const widgetRefs = useRef<{ [key: string]: HTMLElement | null }>({})
@@ -90,6 +92,11 @@ export default function NewTab() {
     setShowHiddenDrawer(false)
   }
 
+  const handleAddWidget = (type: WidgetType) => {
+    addWidget(type)
+    setShowWidgetPicker(false)
+  }
+
   // Count hidden widgets
   const hiddenWidgetCount = layout.filter((w) => !w.visible).length
 
@@ -107,6 +114,7 @@ export default function NewTab() {
         <DashboardHeader
           onShowHiddenWidgets={() => setShowHiddenDrawer(true)}
           hiddenWidgetCount={hiddenWidgetCount}
+          onAddWidget={() => setShowWidgetPicker(true)}
         />
 
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-12">
@@ -129,6 +137,14 @@ export default function NewTab() {
         onRestore={handleRestoreWidget}
         onClose={() => setShowHiddenDrawer(false)}
         open={showHiddenDrawer}
+      />
+
+      {/* Widget Picker Modal */}
+      <WidgetPicker
+        open={showWidgetPicker}
+        onClose={() => setShowWidgetPicker(false)}
+        onAddWidget={handleAddWidget}
+        existingWidgets={layout}
       />
 
       {/* Gradient overlay for depth */}

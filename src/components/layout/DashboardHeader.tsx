@@ -4,19 +4,22 @@ import { navigation } from "~/lib/navigation"
 interface DashboardHeaderProps {
   onShowHiddenWidgets?: () => void
   hiddenWidgetCount?: number
+  onAddWidget?: () => void
 }
 
 export function DashboardHeader({
   onShowHiddenWidgets,
   hiddenWidgetCount = 0,
+  onAddWidget,
 }: DashboardHeaderProps) {
   const handleOpenSettings = () => {
     navigation.openSettings()
   }
 
   const handleAddWidget = () => {
-    // This will be implemented when we have the widget picker
-    console.log("Add widget clicked")
+    if (onAddWidget) {
+      onAddWidget()
+    }
   }
 
   return (

@@ -71,7 +71,8 @@ project-root/
 │   │   │   ├── WidgetRenderer.tsx
 │   │   │   ├── WidgetSettings.tsx
 │   │   │   ├── EmptyState.tsx
-│   │   │   └── HiddenWidgetsDrawer.tsx
+│   │   │   ├── HiddenWidgetsDrawer.tsx
+│   │   │   └── WidgetPicker.tsx
 │   │   ├── help/           # Help and documentation
 │   │   │   └── KeyboardShortcuts.tsx
 │   │   ├── layout/         # Layout components
@@ -274,6 +275,7 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
 2. Extend BaseWidget for consistent behavior
 3. Register in `src/lib/dashboard/widgetRegistry.ts`
 4. Add TypeScript types if needed
+5. Widget will automatically appear in the Widget Picker for users to add
 
 ### Adding a New Calculator
 1. Create calculator component following RICE/TAM examples
@@ -286,6 +288,14 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
 2. Handle in `src/background.ts` command listener
 3. Add to shortcuts array in `useKeyboardShortcuts.ts`
 4. Document in KeyboardShortcuts modal
+
+### Widget Management
+- **Widget Picker**: Click "Add Widget" button in dashboard header to open the widget picker
+- **Search & Filter**: Search widgets by name/description and filter by category
+- **Categories**: Calculators, Feeds, Analytics, Utilities
+- **Add Widgets**: Click "Add" button on any widget card to add it to your dashboard
+- **Widget Status**: Shows which widgets are already on the dashboard
+- **Hidden Widgets**: Use the "Hidden" button to view and restore hidden widgets
 
 ### Testing Approach
 - Manual testing in Chrome extension environment
@@ -305,11 +315,12 @@ const [settings, setSettings] = useStorage<UserSettings>("settings", defaultSett
   - Story 2.4: Quick Actions Popup
   - Story 2.5: Settings Page
   - Story 2.6: Navigation & Routing
-- ⏳ Epic 3: PM Calculators (In Progress)
+  - Enhancement: Widget Picker for adding widgets to dashboard
+- ✅ Epic 3: PM Calculators (In Progress)
   - ✅ Story 3.1: RICE Score Calculator
   - ✅ Story 3.2: TAM/SAM/SOM Calculator
   - ✅ Story 3.3: ROI Calculator
-  - 🔲 Story 3.4: A/B Test Calculator
+  - ✅ Story 3.4: A/B Test Calculator - done with core flows.
 
 ### Ready for Implementation
 - Epic 4: Data Feeds & Integrations
