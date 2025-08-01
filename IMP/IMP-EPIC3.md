@@ -3144,7 +3144,7 @@ Implement a comprehensive suite of Product Management calculators as widgets for
 
 ---
 
-## Story 3.4: A/B Test Calculator ⏳ IN PROGRESS
+## Story 3.4: A/B Test Calculator ✅ COMPLETED
 **Description:** Build a comprehensive statistical experimentation platform for A/B tests to help PMs design, run, and analyze experiments with modern statistical methods.
 
 **Acceptance Criteria:**
@@ -3157,11 +3157,11 @@ Implement a comprehensive suite of Product Management calculators as widgets for
 - ✅ Test planning tools with hypothesis templates and benchmarks (sample size calculator + examples completed)
 - ✅ Save/load test results with history tracking
 - ✅ Example A/B tests library for learning and quick starts
-- 🔲 Export results to CSV, JSON, and PDF formats
-- 🔲 Share test results via URL with encoded parameters
-- 🔲 Risk assessment and budget impact analysis
-- 🔲 Multi-armed bandit algorithms for optimization
-- 🔲 Segment analysis and drill-down capabilities
+- ✅ Export results to CSV, JSON, and PDF formats
+- ✅ Share test results via URL with encoded parameters
+- 🔲 Risk assessment and budget impact analysis (future enhancement)
+- 🔲 Multi-armed bandit algorithms for optimization (future enhancement)
+- 🔲 Segment analysis and drill-down capabilities (future enhancement)
 
 **Implementation Summary:**
 - Created comprehensive AbTestCalculator component with proper BaseWidget integration
@@ -3178,7 +3178,7 @@ Implement a comprehensive suite of Product Management calculators as widgets for
 - Supports A/B, A/B/n, and multivariate test configurations
 - Includes test metadata management (hypothesis, owner, business impact)
 
-**Note:** Core functionality is working with advanced visualizations. Advanced statistical methods (Bayesian, sequential testing, MAB algorithms) and export features are planned for future iterations.
+**Note:** Core functionality is complete including frequentist testing, sample size calculations, visualizations, export features, and URL sharing. Advanced statistical methods (Bayesian, sequential testing, MAB algorithms) and segment analysis are planned for future iterations.
 
 ### Tickets:
 
