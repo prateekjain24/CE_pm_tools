@@ -25,26 +25,39 @@ export function useRiceValidation(values: {
     const errors: ValidationError[] = []
     const warnings: string[] = []
 
-    // Reach validation
-    if (values.reach < 0) {
+    // Reach validation (1-10 scale)
+    if (values.reach < 1) {
       errors.push({
         field: "reach",
-        message: "Reach must be a positive number",
+        message: "Reach must be at least 1",
       })
-    } else if (values.reach === 0) {
-      warnings.push("Reach is 0 - this feature won't impact any users")
+    } else if (values.reach > 10) {
+      errors.push({
+        field: "reach",
+        message: "Reach cannot exceed 10",
+      })
     } else if (!Number.isInteger(values.reach)) {
-      warnings.push("Reach is typically a whole number of users")
-    } else if (values.reach > 1000000) {
-      warnings.push("Reach seems very high - double-check your estimate")
+      errors.push({
+        field: "reach",
+        message: "Reach must be a whole number between 1 and 10",
+      })
     }
 
-    // Impact validation
-    const validImpactValues = [0.25, 0.5, 1, 2, 3]
-    if (!validImpactValues.includes(values.impact)) {
+    // Impact validation (1-10 scale)
+    if (values.impact < 1) {
       errors.push({
         field: "impact",
-        message: "Impact must be 0.25, 0.5, 1, 2, or 3",
+        message: "Impact must be at least 1",
+      })
+    } else if (values.impact > 10) {
+      errors.push({
+        field: "impact",
+        message: "Impact cannot exceed 10",
+      })
+    } else if (!Number.isInteger(values.impact)) {
+      errors.push({
+        field: "impact",
+        message: "Impact must be a whole number between 1 and 10",
       })
     }
 
@@ -65,16 +78,24 @@ export function useRiceValidation(values: {
       warnings.push("100% confidence is rare - are you sure about this estimate?")
     }
 
-    // Effort validation
-    if (values.effort < 0.5) {
+    // Effort validation (1-10 scale)
+    if (values.effort < 1) {
       errors.push({
         field: "effort",
-        message: "Effort must be at least 0.5 person-months",
+        message: "Effort must be at least 1",
       })
-    } else if (values.effort > 24) {
-      warnings.push("Very high effort (2+ years) - consider breaking into smaller features")
-    } else if (values.effort > 12) {
-      warnings.push("High effort (1+ year) - ensure resources are available")
+    } else if (values.effort > 10) {
+      errors.push({
+        field: "effort",
+        message: "Effort cannot exceed 10",
+      })
+    } else if (!Number.isInteger(values.effort)) {
+      errors.push({
+        field: "effort",
+        message: "Effort must be a whole number between 1 and 10",
+      })
+    } else if (values.effort >= 8) {
+      warnings.push("High effort (3+ months) - consider breaking into smaller features")
     }
 
     // Cross-field validations
@@ -82,10 +103,10 @@ export function useRiceValidation(values: {
       const estimatedScore =
         (values.reach * values.impact * (values.confidence / 100)) / values.effort
 
-      if (estimatedScore < 1 && values.effort > 3) {
-        warnings.push("Very low score with high effort - reconsider prioritization")
-      } else if (estimatedScore > 1000) {
-        warnings.push("Extremely high score - verify all inputs are realistic")
+      if (estimatedScore < 5 && values.effort > 5) {
+        warnings.push("Low score with high effort - reconsider prioritization")
+      } else if (estimatedScore > 50) {
+        warnings.push("Very high score - double-check all inputs")
       }
     }
 

@@ -35,6 +35,7 @@ export function calculateRiceScore(params: {
 
 /**
  * Get RICE score category based on score value
+ * With 1-10 scales, max theoretical score is 100, typical range is 0-50
  */
 export function getRiceScoreCategory(score: number): {
   label: string
@@ -42,7 +43,7 @@ export function getRiceScoreCategory(score: number): {
   priority: number
   description: string
 } {
-  if (score >= 100) {
+  if (score >= 30) {
     return {
       label: "Must Do",
       color: "green",
@@ -51,7 +52,7 @@ export function getRiceScoreCategory(score: number): {
     }
   }
 
-  if (score >= 50) {
+  if (score >= 15) {
     return {
       label: "Should Do",
       color: "yellow",
@@ -60,7 +61,7 @@ export function getRiceScoreCategory(score: number): {
     }
   }
 
-  if (score >= 20) {
+  if (score >= 5) {
     return {
       label: "Could Do",
       color: "orange",
@@ -85,7 +86,8 @@ export function formatRiceScore(score: number): string {
 }
 
 /**
- * Calculate the percentage contribution of each component to the final score
+ * Calculate the actual contribution of each component to the final score
+ * Shows how much each factor contributes to the total score value
  */
 export function calculateComponentContributions(params: {
   reach: number
@@ -98,28 +100,38 @@ export function calculateComponentContributions(params: {
   confidence: number
   effort: number
 } {
-  const { reach, impact, confidence, effort } = params
+  // Calculate the actual score
+  const actualScore = calculateRiceScore(params)
 
-  // Calculate raw contributions (without effort division)
-  const totalProduct = reach * impact * (confidence / 100)
-
-  if (totalProduct === 0) {
+  // If score is 0, all contributions are 0
+  if (actualScore === 0) {
     return { reach: 0, impact: 0, confidence: 0, effort: 0 }
   }
 
-  // Calculate percentage contributions
-  const reachContribution = (reach / totalProduct) * 100
-  const impactContribution = (impact / totalProduct) * 100
-  const confidenceContribution = (confidence / 100 / totalProduct) * 100
+  // Calculate what the score would be with each component at its minimum value
+  // This shows how much each component adds to the score
 
-  // Effort reduces the score, so we show it as a negative contribution
-  const effortContribution = effort > 1 ? -((effort - 1) / effort) * 100 : 0
+  // Reach contribution: difference between actual score and score with reach=1
+  const scoreWithMinReach = calculateRiceScore({ ...params, reach: 1 })
+  const reachContribution = actualScore - scoreWithMinReach
+
+  // Impact contribution: difference between actual score and score with impact=1
+  const scoreWithMinImpact = calculateRiceScore({ ...params, impact: 1 })
+  const impactContribution = actualScore - scoreWithMinImpact
+
+  // Confidence contribution: difference between actual score and score with confidence=10%
+  const scoreWithMinConfidence = calculateRiceScore({ ...params, confidence: 10 })
+  const confidenceContribution = actualScore - scoreWithMinConfidence
+
+  // Effort contribution: how much the score would increase with effort=1
+  const scoreWithMinEffort = calculateRiceScore({ ...params, effort: 1 })
+  const effortContribution = scoreWithMinEffort - actualScore
 
   return {
-    reach: Math.round(reachContribution),
-    impact: Math.round(impactContribution),
-    confidence: Math.round(confidenceContribution),
-    effort: Math.round(effortContribution),
+    reach: Math.max(0, reachContribution),
+    impact: Math.max(0, impactContribution),
+    confidence: Math.max(0, confidenceContribution),
+    effort: Math.max(0, effortContribution),
   }
 }
 
@@ -140,17 +152,17 @@ export function generateRiceInsights(params: {
   // Score-based insight
   insights.push(`This feature is a "${category.label}" priority with a score of ${score}`)
 
-  // Reach insights
-  if (reach < 100) {
-    insights.push("Consider ways to increase reach to impact more users")
-  } else if (reach > 10000) {
+  // Reach insights (1-10 scale)
+  if (reach <= 3) {
+    insights.push("Limited reach - suitable for testing or niche features")
+  } else if (reach >= 8) {
     insights.push("Excellent reach! This will impact a large user base")
   }
 
-  // Impact insights
-  if (impact < 1) {
+  // Impact insights (1-10 scale)
+  if (impact <= 3) {
     insights.push("Low impact score - ensure this aligns with strategic goals")
-  } else if (impact >= 2) {
+  } else if (impact >= 7) {
     insights.push("High impact feature that will significantly improve user experience")
   }
 
@@ -161,19 +173,19 @@ export function generateRiceInsights(params: {
     insights.push("High confidence level indicates good validation")
   }
 
-  // Effort insights
-  if (effort > 6) {
+  // Effort insights (1-10 scale)
+  if (effort >= 7) {
     insights.push("High effort requirement - consider breaking into smaller features")
-  } else if (effort <= 1) {
+  } else if (effort <= 3) {
     insights.push("Low effort - great candidate for quick wins")
   }
 
   // Score optimization insights
-  if (score < 20 && effort > 3) {
+  if (score < 5 && effort > 5) {
     insights.push("High effort for low score - reconsider scope or deprioritize")
   }
 
-  if (score > 50 && effort <= 2) {
+  if (score > 20 && effort <= 3) {
     insights.push("Excellent ROI - low effort with high impact")
   }
 

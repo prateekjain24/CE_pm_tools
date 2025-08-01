@@ -29,10 +29,10 @@ export default function RiceScoreDisplay({
   const category = getRiceScoreCategory(score)
   const colors = categoryColors[category.color as keyof typeof categoryColors]
 
-  // Data for the semi-circular gauge
+  // Data for the semi-circular gauge (max score is 100)
   const gaugeData = [
-    { name: "Score", value: Math.min(score, 200), fill: colors.primary },
-    { name: "Remaining", value: Math.max(0, 200 - score), fill: "#e5e7eb" },
+    { name: "Score", value: Math.min(score, 100), fill: colors.primary },
+    { name: "Remaining", value: Math.max(0, 100 - score), fill: "#e5e7eb" },
   ]
 
   const scoreMotion = createSafeAnimationProps(animated, "scaleIn")
@@ -54,6 +54,8 @@ export default function RiceScoreDisplay({
               outerRadius="90%"
               dataKey="value"
               stroke="none"
+              label={false}
+              labelLine={false}
             >
               {gaugeData.map((entry) => (
                 <Cell key={`cell-${entry.name}`} fill={entry.fill} />
@@ -77,13 +79,13 @@ export default function RiceScoreDisplay({
         {/* Score Text Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <SafeMotionDiv className="text-5xl font-bold" style={{ color: colors.primary }}>
-            {score}
+            {Math.round(score)}
           </SafeMotionDiv>
           <SafeMotionDiv
             className="text-sm text-gray-600 dark:text-gray-400 mt-1"
             {...categoryMotion}
           >
-            RICE Score
+            out of 100
           </SafeMotionDiv>
         </div>
       </SafeMotionDiv>

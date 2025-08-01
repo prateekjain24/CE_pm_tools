@@ -12,13 +12,14 @@
 export interface RiceScore {
   id: string
   name: string
-  reach: number // Number of users affected
-  impact: number // 0.25, 0.5, 1, 2, 3 (Minimal to Massive)
+  reach: number // 1-10 scale (1: <100 users, 10: 10000+ users)
+  impact: number // 1-10 scale (1: minimal, 10: massive)
   confidence: number // 0-100% as decimal (0-1)
-  effort: number // Person-months
+  effort: number // 1-10 scale (1: days, 10: 3+ months)
   score: number // Calculated: (reach * impact * confidence) / effort
   savedAt: Date
   notes?: string
+  migratedAt?: number // Timestamp when migrated to new scale
 }
 
 /**
@@ -926,14 +927,57 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 }
 
 /**
- * Impact values for RICE scoring
+ * RICE scale ranges for better UX guidance
  */
-export const RICE_IMPACT_VALUES = {
-  MINIMAL: 0.25,
-  LOW: 0.5,
-  MEDIUM: 1,
-  HIGH: 2,
-  MASSIVE: 3,
+export const RICE_SCALE_RANGES = {
+  reach: {
+    min: 1,
+    max: 10,
+    labels: {
+      1: "Very Small (<10 users)",
+      2: "Small (10-50 users)",
+      3: "Small-Medium (50-100 users)",
+      4: "Medium (100-500 users)",
+      5: "Medium (500-1K users)",
+      6: "Medium-Large (1K-2.5K users)",
+      7: "Large (2.5K-5K users)",
+      8: "Large (5K-10K users)",
+      9: "Very Large (10K-50K users)",
+      10: "Massive (50K+ users)",
+    },
+  },
+  impact: {
+    min: 1,
+    max: 10,
+    labels: {
+      1: "Minimal impact",
+      2: "Very low impact",
+      3: "Low impact",
+      4: "Low-medium impact",
+      5: "Medium impact",
+      6: "Medium-high impact",
+      7: "High impact",
+      8: "Very high impact",
+      9: "Critical impact",
+      10: "Massive impact",
+    },
+  },
+  effort: {
+    min: 1,
+    max: 10,
+    labels: {
+      1: "Few hours",
+      2: "1-2 days",
+      3: "3-5 days",
+      4: "1-2 weeks",
+      5: "2-4 weeks",
+      6: "1-2 months",
+      7: "2-3 months",
+      8: "3-4 months",
+      9: "4-6 months",
+      10: "6+ months",
+    },
+  },
 } as const
 
 /**

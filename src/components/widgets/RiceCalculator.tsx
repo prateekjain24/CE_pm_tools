@@ -3,10 +3,11 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react"
 import { Button } from "~/components/common/Button"
 import { Input } from "~/components/common/Input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/common/Tabs"
-import { getFieldError, useRiceValidation, validateProjectName } from "~/hooks/useRiceValidation"
+import { useRiceValidation, validateProjectName } from "~/hooks/useRiceValidation"
 import { calculateRiceScore, getRiceScoreCategory } from "~/lib/calculators/rice"
+import { migrateRiceScores } from "~/lib/storage/migrations"
 import type { RiceScore } from "~/types"
-import { RICE_IMPACT_VALUES } from "~/types"
+import { RICE_SCALE_RANGES } from "~/types"
 import { BaseWidget } from "./BaseWidget"
 import { WidgetSkeleton } from "./WidgetSkeleton"
 
@@ -54,15 +55,25 @@ const getScoreCategoryStyles = (score: number) => {
 }
 
 export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculatorProps) {
-  const [calculations, setCalculations] = useStorage<RiceScore[]>("rice-history", [])
+  const [calculations, setCalculations] = useStorage<RiceScore[]>("rice-history", [], {
+    // Apply migration when loading from storage
+    area: "sync",
+    transformer: {
+      deserialize: (value) => {
+        const parsed = JSON.parse(value)
+        return migrateRiceScores(parsed)
+      },
+      serialize: JSON.stringify,
+    },
+  })
   const viewMode = (widgetConfig?.viewMode as "compact" | "full") || "full"
   const onExpand = widgetConfig?.onExpand as (() => void) | undefined
   const [projectName, setProjectName] = useState("")
   const [formData, setFormData] = useState({
-    reach: 0,
-    impact: RICE_IMPACT_VALUES.MEDIUM,
+    reach: 5,
+    impact: 5,
     confidence: 50,
-    effort: 1,
+    effort: 5,
   })
   const [showHistory, setShowHistory] = useState(false)
   const [projectNameError, setProjectNameError] = useState<string>()
@@ -120,10 +131,10 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
     setProjectName("")
     setProjectNameError(undefined)
     setFormData({
-      reach: 0,
-      impact: RICE_IMPACT_VALUES.MEDIUM,
+      reach: 5,
+      impact: 5,
       confidence: 50,
-      effort: 1,
+      effort: 5,
     })
   }
 
@@ -180,7 +191,7 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                 </span>
               </div>
               <div className={`text-3xl font-bold ${displayScoreCategory.color}`}>
-                {formatNumber(Math.round(data.score))}
+                {formatNumber(Math.round(data.score))}/100
               </div>
               <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{data.name}</div>
               <div
@@ -243,7 +254,7 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
             {/* Reach */}
             <div className="space-y-1">
               <label
-                htmlFor="reach-input"
+                htmlFor="reach-select"
                 className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <svg
@@ -260,24 +271,23 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                     d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                   />
                 </svg>
-                Reach
+                Reach (1-10)
               </label>
-              <Input
-                id="reach-input"
-                type="number"
-                value={formData.reach || ""}
-                onChange={(e) => setFormData({ ...formData, reach: Number(e.target.value) || 0 })}
-                placeholder="0"
-                min="0"
-                helperText="How many users will this impact in the first quarter?"
-                error={getFieldError(validation.errors, "reach")}
-                fullWidth
-              />
-              {formData.reach > 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatNumber(formData.reach)} users
-                </p>
-              )}
+              <select
+                id="reach-select"
+                value={formData.reach}
+                onChange={(e) => setFormData({ ...formData, reach: Number(e.target.value) })}
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                {Object.entries(RICE_SCALE_RANGES.reach.labels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {value} - {label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                How many users will this impact?
+              </p>
             </div>
 
             {/* Impact */}
@@ -300,7 +310,7 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                     d="M13 10V3L4 14h7v7l9-11h-7z"
                   />
                 </svg>
-                Impact
+                Impact (1-10)
               </label>
               <select
                 id="impact-select"
@@ -308,13 +318,11 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                 onChange={(e) => setFormData({ ...formData, impact: Number(e.target.value) })}
                 className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               >
-                <option value={RICE_IMPACT_VALUES.MINIMAL}>
-                  Minimal (0.25) - Barely noticeable
-                </option>
-                <option value={RICE_IMPACT_VALUES.LOW}>Low (0.5) - Minor improvement</option>
-                <option value={RICE_IMPACT_VALUES.MEDIUM}>Medium (1) - Moderate improvement</option>
-                <option value={RICE_IMPACT_VALUES.HIGH}>High (2) - Major improvement</option>
-                <option value={RICE_IMPACT_VALUES.MASSIVE}>Massive (3) - Game changer</option>
+                {Object.entries(RICE_SCALE_RANGES.impact.labels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {value} - {label}
+                  </option>
+                ))}
               </select>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 How much will this improve the user experience?
@@ -368,7 +376,7 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
             {/* Effort */}
             <div className="space-y-1">
               <label
-                htmlFor="effort-input"
+                htmlFor="effort-select"
                 className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <svg
@@ -385,27 +393,23 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                Effort
+                Effort (1-10)
               </label>
-              <Input
-                id="effort-input"
-                type="number"
+              <select
+                id="effort-select"
                 value={formData.effort}
-                onChange={(e) =>
-                  setFormData({ ...formData, effort: Number(e.target.value) || 0.5 })
-                }
-                placeholder="1"
-                min="0.5"
-                step="0.5"
-                helperText="Person-months required to build this"
-                error={getFieldError(validation.errors, "effort")}
-                fullWidth
-              />
-              {formData.effort > 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {formData.effort} {formData.effort === 1 ? "person-month" : "person-months"}
-                </p>
-              )}
+                onChange={(e) => setFormData({ ...formData, effort: Number(e.target.value) })}
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                {Object.entries(RICE_SCALE_RANGES.effort.labels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {value} - {label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                How much effort is required to build this?
+              </p>
             </div>
           </div>
 

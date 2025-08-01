@@ -1,4 +1,4 @@
-import type { WidgetConfig } from "~/types"
+import type { RiceScore, WidgetConfig } from "~/types"
 
 /**
  * Storage migration system for handling schema changes
@@ -9,6 +9,13 @@ import type { WidgetConfig } from "~/types"
  * Increment this when making breaking changes to the layout schema
  */
 export const CURRENT_LAYOUT_VERSION = 1
+
+/**
+ * RICE score version
+ * Version 1: Old scale with raw reach numbers, decimal impact values
+ * Version 2: New 1-10 scale for all inputs
+ */
+export const CURRENT_RICE_VERSION = 2
 
 /**
  * Layout storage schema with version
@@ -189,4 +196,112 @@ export const MigrationUtils = {
       return true
     })
   },
+}
+
+/**
+ * RICE Score Migration Functions
+ */
+
+/**
+ * Map old reach values (raw numbers) to 1-10 scale
+ */
+function mapReachToNewScale(oldReach: number): number {
+  if (oldReach <= 10) return 1
+  if (oldReach <= 50) return 2
+  if (oldReach <= 100) return 3
+  if (oldReach <= 500) return 4
+  if (oldReach <= 1000) return 5
+  if (oldReach <= 2500) return 6
+  if (oldReach <= 5000) return 7
+  if (oldReach <= 10000) return 8
+  if (oldReach <= 50000) return 9
+  return 10
+}
+
+/**
+ * Map old impact values (0.25-3) to 1-10 scale
+ */
+function mapImpactToNewScale(oldImpact: number): number {
+  // Handle exact matches for old scale
+  if (oldImpact === 0.25) return 2
+  if (oldImpact === 0.5) return 3
+  if (oldImpact === 1) return 5
+  if (oldImpact === 2) return 7
+  if (oldImpact === 3) return 9
+
+  // Handle edge cases
+  if (oldImpact < 0.25) return 1
+  if (oldImpact > 3) return 10
+
+  // Linear interpolation for in-between values
+  if (oldImpact < 0.5) return 2
+  if (oldImpact < 1) return 4
+  if (oldImpact < 2) return 6
+  if (oldImpact < 3) return 8
+  return 9
+}
+
+/**
+ * Map old effort values (person-months) to 1-10 scale
+ */
+function mapEffortToNewScale(oldEffort: number): number {
+  if (oldEffort <= 0.25) return 1
+  if (oldEffort <= 0.5) return 2
+  if (oldEffort <= 1) return 3
+  if (oldEffort <= 2) return 4
+  if (oldEffort <= 4) return 5
+  if (oldEffort <= 8) return 6
+  if (oldEffort <= 12) return 7
+  if (oldEffort <= 16) return 8
+  if (oldEffort <= 24) return 9
+  return 10
+}
+
+/**
+ * Migrate RICE scores from old scale to new 1-10 scale
+ */
+export function migrateRiceScores(scores: any[]): RiceScore[] {
+  if (!Array.isArray(scores)) return []
+
+  return scores.map((score) => {
+    // Check if already migrated (all values are 1-10 integers)
+    const isMigrated =
+      score.reach >= 1 &&
+      score.reach <= 10 &&
+      Number.isInteger(score.reach) &&
+      score.impact >= 1 &&
+      score.impact <= 10 &&
+      Number.isInteger(score.impact) &&
+      score.effort >= 1 &&
+      score.effort <= 10 &&
+      Number.isInteger(score.effort)
+
+    if (isMigrated) {
+      return score as RiceScore
+    }
+
+    // Migrate old scale to new scale
+    const migratedScore: RiceScore = {
+      ...score,
+      reach: mapReachToNewScale(score.reach || 0),
+      impact: mapImpactToNewScale(score.impact || 1),
+      effort: mapEffortToNewScale(score.effort || 1),
+      // Confidence stays the same (already 0-100)
+      confidence: score.confidence,
+      // Recalculate score with new values
+      score:
+        (mapReachToNewScale(score.reach || 0) *
+          mapImpactToNewScale(score.impact || 1) *
+          (score.confidence / 100)) /
+        mapEffortToNewScale(score.effort || 1),
+      // Add migration timestamp
+      migratedAt: Date.now(),
+    }
+
+    console.log(
+      `Migrated RICE score "${score.name}": reach ${score.reach}→${migratedScore.reach}, impact ${score.impact}→${migratedScore.impact}, effort ${score.effort}→${migratedScore.effort}`
+    )
+
+    return migratedScore
+  })
 }
