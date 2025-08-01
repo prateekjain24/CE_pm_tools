@@ -309,22 +309,374 @@ export interface MonteCarloResults {
 }
 
 /**
- * A/B Test Statistical Significance Calculator
+ * A/B Test Statistical Significance Calculator - Comprehensive Types
  */
-export interface AbTestResult {
+
+/**
+ * Test types supported
+ */
+export type TestType = "ab" | "abn" | "multivariate"
+
+/**
+ * Metric types for testing
+ */
+export type MetricType = "conversion" | "revenue" | "engagement" | "retention" | "custom"
+
+/**
+ * Statistical methods available
+ */
+export type StatisticalMethod = "frequentist" | "bayesian" | "sequential" | "mab"
+
+/**
+ * Test direction
+ */
+export type TestDirection = "one-tailed" | "two-tailed"
+
+/**
+ * Sequential testing methods
+ */
+export type SequentialMethod = "AGILE" | "mSPRT"
+
+/**
+ * Multi-armed bandit algorithms
+ */
+export type MABAlgorithm = "thompson" | "ucb" | "epsilon-greedy" | "contextual"
+
+/**
+ * Multiple testing correction methods
+ */
+export type CorrectionMethod = "bonferroni" | "fdr" | "holm" | "none"
+
+/**
+ * Test variation data
+ */
+export interface Variation {
   id: string
   name: string
-  controlSize: number // Sample size of control group
-  controlConversions: number // Conversions in control
-  variantSize: number // Sample size of variant
-  variantConversions: number // Conversions in variant
-  controlRate: number // Control conversion rate
-  variantRate: number // Variant conversion rate
-  relativeUplift: number // Percentage change
-  confidence: number // Statistical confidence level (e.g., 0.95)
-  pValue: number // Statistical p-value
-  isSignificant: boolean // Whether result is statistically significant
+  visitors: number
+  conversions: number
+  revenue?: number
+  engagement?: number
+  customMetrics?: Record<string, number>
+}
+
+/**
+ * Test configuration
+ */
+export interface TestConfig {
+  testType: TestType
+  metric: MetricType
+  statisticalMethod: StatisticalMethod
+  confidenceLevel: 90 | 95 | 99
+  testDirection: TestDirection
+  minimumEffect: number // Minimum detectable effect (%)
+  trafficAllocation: Record<string, number> // Variation ID -> percentage
+  correctionMethod?: CorrectionMethod
+}
+
+/**
+ * Bayesian configuration
+ */
+export interface BayesianConfig {
+  priorAlpha?: number // Beta prior alpha
+  priorBeta?: number // Beta prior beta
+  credibleLevel: number // Credible interval level (e.g., 95)
+  priorType?: "uniform" | "informative"
+}
+
+/**
+ * Sequential testing configuration
+ */
+export interface SequentialConfig {
+  method: SequentialMethod
+  alpha: number // Type I error rate
+  beta: number // Type II error rate
+  maxSampleSize?: number
+  tau?: number // For mSPRT
+}
+
+/**
+ * MAB configuration
+ */
+export interface MABConfig {
+  algorithm: MABAlgorithm
+  explorationRate?: number // For epsilon-greedy, UCB
+  contextFeatures?: string[] // For contextual bandits
+}
+
+/**
+ * Test metadata
+ */
+export interface TestMetadata {
+  name: string
+  hypothesis: string
+  owner: string
+  stakeholders: string[]
+  startDate?: Date
+  endDate?: Date
+  tags: string[]
+  businessImpact: {
+    metric: string
+    estimatedValue: number
+    confidence: "low" | "medium" | "high"
+  }
+}
+
+/**
+ * Test result for a single method
+ */
+export interface TestResult {
+  method: StatisticalMethod
+  pValue?: number // For frequentist
+  isSignificant: boolean
+  confidenceInterval?: [number, number]
+  credibleInterval?: [number, number] // For Bayesian
+  posteriorDistribution?: number[] // For Bayesian
+  uplift: number // Relative improvement
+  absoluteUplift?: number // Absolute improvement
+  effectSize: number // Cohen's d or similar
+  power: number // Statistical power achieved
+  stoppingBoundaries?: { upper: number; lower: number } // For sequential
+  shouldStop?: boolean // For sequential/MAB
+  multipleTestingAdjusted?: boolean
+  winner?: string // Variation ID
+  probabilityBest?: Record<string, number> // For Bayesian/MAB
+}
+
+/**
+ * Bayesian-specific results
+ */
+export interface BayesianResult {
+  variation: string
+  posteriorMean: number
+  posteriorMedian?: number
+  credibleInterval: [number, number]
+  posteriorSamples: number[]
+  probabilityBest: number
+  expectedLoss?: number
+  valueRemaining?: number // For optimal stopping
+}
+
+/**
+ * Sequential testing state
+ */
+export interface SequentialState {
+  currentSample: number
+  testStatistic: number
+  boundaries: { upper: number; lower: number }
+  alphaSoFar: number
+  shouldContinue: boolean
+  expectedSamplesRemaining?: number
+}
+
+/**
+ * MAB state
+ */
+export interface MABState {
+  successes: Record<string, number>
+  failures: Record<string, number>
+  totalPulls: Record<string, number>
+  lastRecommendation?: string
+  regret?: number
+}
+
+/**
+ * MAB result
+ */
+export interface MABResult {
+  recommendedVariation: string
+  allocationProbabilities: Record<string, number>
+  expectedRegret: number
+  confidenceBounds?: Record<string, [number, number]>
+}
+
+/**
+ * Sample size calculation inputs
+ */
+export interface SampleSizeInputs {
+  method: StatisticalMethod
+  metric: {
+    type: "binary" | "continuous"
+    baseline: number
+    variance?: number // For continuous metrics
+  }
+  effect: {
+    type: "absolute" | "relative"
+    value: number
+    practicalSignificance?: number
+  }
+  statisticalParams: {
+    confidenceLevel: number
+    power: number
+    testDirection: TestDirection
+    multipleComparisons?: number
+  }
+  traffic: {
+    daily: number
+    allocation: Record<string, number>
+    seasonality?: SeasonalityPattern
+    constraints?: {
+      maxDuration: number
+      maxBudget: number
+      costPerSample: number
+    }
+  }
+}
+
+/**
+ * Seasonality pattern for traffic
+ */
+export interface SeasonalityPattern {
+  dayOfWeek: number[] // 7 values representing multipliers
+  monthly: number[] // 12 values for months
+  holidays: { date: string; impact: number }[]
+}
+
+/**
+ * Sample size result
+ */
+export interface SampleSizeResult {
+  perVariation: Record<string, number>
+  total: number
+  powerAchieved: number
+  duration: {
+    days: number
+    weeks: number
+    confidenceInterval: [number, number]
+  }
+  cost?: {
+    total: number
+    perVariation: Record<string, number>
+  }
+  notes: string[]
+}
+
+/**
+ * Time series data for visualization
+ */
+export interface TimeSeriesData {
+  date: Date
+  variations: Record<
+    string,
+    {
+      visitors: number
+      conversions: number
+      rate: number
+      cumulative: {
+        visitors: number
+        conversions: number
+        rate: number
+      }
+    }
+  >
+  pValues?: Record<string, number>
+  significance?: Record<string, boolean>
+}
+
+/**
+ * Segment analysis data
+ */
+export interface SegmentAnalysis {
+  segmentName: string
+  data: Record<
+    string,
+    {
+      visitors: number
+      conversions: number
+      rate: number
+      uplift?: number
+      significance?: boolean
+    }
+  >
+}
+
+/**
+ * Test template
+ */
+export interface TestTemplate {
+  id: string
+  name: string
+  category: string
+  description: string
+  defaultConfig: Partial<TestConfig>
+  hypothesis: {
+    template: string
+    examples: string[]
+  }
+  benchmarks: {
+    baselineConversion: { min: number; avg: number; max: number }
+    typicalUplift: { min: number; avg: number; max: number }
+    testDuration: { min: number; avg: number; max: number } // days
+  }
+  checklist: string[]
+}
+
+/**
+ * Complete A/B test data
+ */
+export interface AbTest {
+  id: string
+  config: TestConfig
+  metadata: TestMetadata
+  variations: Variation[]
+  results?: TestResult[]
+  bayesianResults?: BayesianResult[]
+  sequentialState?: SequentialState
+  mabState?: MABState
+  timeSeriesData?: TimeSeriesData[]
+  segmentAnalysis?: SegmentAnalysis[]
   savedAt: Date
+  completedAt?: Date
+  status: "planning" | "running" | "completed" | "stopped"
+}
+
+/**
+ * Saved test for history
+ */
+export interface SavedTest extends AbTest {
+  notes?: string
+  learnings?: string[]
+  decisions?: {
+    action: string
+    rationale: string
+    implementedAt?: Date
+  }
+}
+
+/**
+ * Power analysis data point
+ */
+export interface PowerCurvePoint {
+  sampleSize: number
+  power: number
+  effectSize: number
+}
+
+/**
+ * Sensitivity analysis variable
+ */
+export interface SensitivityVariable {
+  name: string
+  baseValue: number
+  minValue: number
+  maxValue: number
+  step: number
+  impact: "costs" | "benefits" | "both"
+}
+
+/**
+ * Export options
+ */
+export interface ExportOptions {
+  format: "csv" | "json" | "pdf" | "pptx"
+  includeRawData?: boolean
+  includeCharts?: boolean
+  branding?: {
+    logo?: string
+    colors?: Record<string, string>
+    companyName?: string
+  }
+  sections?: string[] // Which sections to include
 }
 
 // ========== Feed Types ==========

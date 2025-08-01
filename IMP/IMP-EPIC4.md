@@ -10,21 +10,24 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
 - Ensure reliable data updates with proper error handling
 - Optimize performance with intelligent caching
 
-**Total Story Points:** 34 SP  
+**Total Story Points:** 54 SP  
 **Total Stories:** 5  
-**Total Tickets:** 26  
+**Total Tickets:** 33  
 
 ---
 
 ## Story 4.1: Feed Infrastructure
-**Description:** Create the foundational infrastructure for fetching, caching, and managing data feeds using Chrome's alarm API and Plasmo's storage system.
+**Description:** Create a robust, scalable foundation for fetching, caching, and managing data feeds with advanced error handling, performance optimization, and security features using Chrome's alarm API and Plasmo's storage system.
 
 **Acceptance Criteria:**
-- Background worker fetches feeds on schedule
-- Intelligent caching reduces API calls
-- Robust error handling and retry logic
-- Feed status monitoring and health checks
-- Configurable refresh intervals per feed
+- Background worker with intelligent feed orchestration and priority management
+- Advanced caching with compression, ETags, and delta updates
+- Comprehensive error handling with circuit breakers and offline support
+- Real-time feed monitoring with performance profiling and quality metrics
+- Configurable refresh intervals with A/B testing capabilities
+- Security layer with CORS proxy and content sanitization
+- Performance optimization using WebWorkers and request batching
+- Network resilience with graceful degradation
 
 ### Tickets:
 
@@ -85,87 +88,229 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
   })
   ```
 
-#### Ticket 4.1.2: Implement Feed Caching Mechanism
-- **Description:** Build intelligent caching system to minimize API calls and improve performance
-- **Story Points:** 2 SP
+#### Ticket 4.1.2: Implement Advanced Feed Caching System
+- **Description:** Build intelligent caching system with compression, ETags, and image optimization to minimize API calls and maximize storage efficiency
+- **Story Points:** 3 SP
 - **Technical Requirements:**
-  - Cache responses with TTL (Time To Live)
-  - Implement cache invalidation strategies
-  - Store cache in chrome.storage.local
-  - Add cache hit/miss metrics
-  - Support partial cache updates
-  - Handle cache size limits (5MB chrome.storage limit)
+  - Cache responses with TTL and ETag support for conditional requests
+  - Implement LZString compression for text content
+  - Add image optimization with lazy loading and thumbnail generation
+  - Smart cache invalidation with partial updates (delta sync)
+  - Store cache in chrome.storage.local with IndexedDB fallback
+  - Add comprehensive cache hit/miss/stale metrics
+  - Implement cache warming for frequently accessed feeds
+  - Handle cache size limits with intelligent eviction policies
+  - Support offline mode with stale-while-revalidate strategy
 - **Dependencies:** 4.1.1
 - **Implementation Notes:**
   ```typescript
   // src/lib/feeds/FeedCache.ts
+  import LZString from 'lz-string'
+  
   interface CacheEntry<T> {
     data: T
+    compressed?: boolean
     timestamp: number
     ttl: number
     etag?: string
     lastModified?: string
+    size: number
+    accessCount: number
+    lastAccessed: number
+  }
+  
+  interface CacheStrategy {
+    compress: boolean
+    ttl: number
+    maxSize: number
+    staleWhileRevalidate: boolean
   }
   
   export class FeedCache {
-    constructor(private storage: Storage) {}
+    private readonly COMPRESSION_THRESHOLD = 1024 // 1KB
+    private readonly MAX_CACHE_SIZE = 4 * 1024 * 1024 // 4MB (leaving 1MB buffer)
+    private currentSize = 0
     
-    async get<T>(key: string): Promise<T | null> {
+    constructor(
+      private storage: Storage,
+      private indexedDB?: IDBDatabase
+    ) {
+      this.initializeCache()
+    }
+    
+    async get<T>(key: string, strategy?: CacheStrategy): Promise<{
+      data: T | null
+      stale?: boolean
+      etag?: string
+    }> {
       const cacheKey = `cache:${key}`
-      const entry = await this.storage.get<CacheEntry<T>>(cacheKey)
+      const entry = await this.getFromStorage<CacheEntry<T>>(cacheKey)
       
-      if (!entry) return null
+      if (!entry) return { data: null }
+      
+      // Update access metrics
+      entry.accessCount++
+      entry.lastAccessed = Date.now()
       
       // Check if cache is still valid
       const now = Date.now()
-      if (now - entry.timestamp > entry.ttl) {
-        await this.storage.remove(cacheKey)
-        return null
+      const isExpired = now - entry.timestamp > entry.ttl
+      
+      if (isExpired && !strategy?.staleWhileRevalidate) {
+        await this.remove(cacheKey)
+        return { data: null }
       }
       
-      return entry.data
+      // Decompress if needed
+      let data = entry.data
+      if (entry.compressed && typeof data === 'string') {
+        data = JSON.parse(LZString.decompressFromUTF16(data))
+      }
+      
+      return {
+        data,
+        stale: isExpired,
+        etag: entry.etag
+      }
     }
     
-    async set<T>(key: string, data: T, ttl: number, headers?: {
-      etag?: string
-      lastModified?: string
-    }): Promise<void> {
+    async set<T>(
+      key: string, 
+      data: T, 
+      strategy: CacheStrategy,
+      headers?: {
+        etag?: string
+        lastModified?: string
+      }
+    ): Promise<void> {
       const cacheKey = `cache:${key}`
+      const dataStr = JSON.stringify(data)
+      const shouldCompress = strategy.compress && 
+                           dataStr.length > this.COMPRESSION_THRESHOLD
+      
+      let processedData: any = data
+      let size = dataStr.length
+      
+      if (shouldCompress) {
+        processedData = LZString.compressToUTF16(dataStr)
+        size = processedData.length * 2 // UTF-16 chars are 2 bytes
+      }
+      
+      // Check if we need to evict before adding
+      if (this.currentSize + size > this.MAX_CACHE_SIZE) {
+        await this.evictWithLRU(size)
+      }
+      
       const entry: CacheEntry<T> = {
-        data,
+        data: processedData,
+        compressed: shouldCompress,
         timestamp: Date.now(),
-        ttl,
+        ttl: strategy.ttl,
+        size,
+        accessCount: 0,
+        lastAccessed: Date.now(),
         ...headers
       }
       
+      await this.setToStorage(cacheKey, entry)
+      this.currentSize += size
+    }
+    
+    async validateWithEtag(key: string, currentEtag: string): Promise<boolean> {
+      const result = await this.get(key)
+      return result.etag === currentEtag
+    }
+    
+    async warmCache(keys: string[], fetcher: (key: string) => Promise<any>): Promise<void> {
+      const promises = keys.map(async (key) => {
+        const cached = await this.get(key)
+        if (!cached.data) {
+          const data = await fetcher(key)
+          await this.set(key, data, { 
+            compress: true, 
+            ttl: 3600000,
+            maxSize: 1024 * 1024,
+            staleWhileRevalidate: true 
+          })
+        }
+      })
+      
+      await Promise.allSettled(promises)
+    }
+    
+    private async evictWithLRU(requiredSpace: number): Promise<void> {
+      const allEntries = await this.getAllCacheEntries()
+      
+      // Sort by LRU score (combination of access count and last accessed)
+      allEntries.sort((a, b) => {
+        const scoreA = a.entry.accessCount * 0.3 + 
+                      (Date.now() - a.entry.lastAccessed) * 0.7
+        const scoreB = b.entry.accessCount * 0.3 + 
+                      (Date.now() - b.entry.lastAccessed) * 0.7
+        return scoreB - scoreA // Higher score = less likely to evict
+      })
+      
+      let freedSpace = 0
+      let i = allEntries.length - 1
+      
+      while (freedSpace < requiredSpace && i >= 0) {
+        const entry = allEntries[i]
+        await this.remove(entry.key)
+        freedSpace += entry.entry.size
+        i--
+      }
+    }
+    
+    private async getFromStorage<T>(key: string): Promise<T | null> {
+      // Try chrome.storage first
       try {
-        await this.storage.set(cacheKey, entry)
+        return await this.storage.get(key)
       } catch (error) {
-        // Handle storage quota exceeded
-        if (error.message?.includes('QUOTA_BYTES')) {
-          await this.evictOldestEntries()
-          await this.storage.set(cacheKey, entry)
+        // Fallback to IndexedDB for large items
+        if (this.indexedDB) {
+          return await this.getFromIndexedDB(key)
+        }
+        return null
+      }
+    }
+    
+    private async setToStorage(key: string, value: any): Promise<void> {
+      try {
+        await this.storage.set(key, value)
+      } catch (error) {
+        // Fallback to IndexedDB for large items
+        if (this.indexedDB && error.message?.includes('QUOTA_BYTES')) {
+          await this.setToIndexedDB(key, value)
+        } else {
+          throw error
         }
       }
     }
     
-    async validateWithEtag(key: string, currentEtag: string): Promise<boolean> {
-      const entry = await this.storage.get<CacheEntry<any>>(`cache:${key}`)
-      return entry?.etag === currentEtag
+    // Image optimization methods
+    async cacheImage(url: string, options: {
+      maxWidth?: number
+      maxHeight?: number
+      quality?: number
+    } = {}): Promise<string> {
+      const cached = await this.get(`img:${url}`)
+      if (cached.data) return cached.data as string
+      
+      const optimized = await this.optimizeImage(url, options)
+      await this.set(`img:${url}`, optimized, {
+        compress: false, // Already optimized
+        ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxSize: 500 * 1024, // 500KB max
+        staleWhileRevalidate: true
+      })
+      
+      return optimized
     }
     
-    private async evictOldestEntries(): Promise<void> {
-      const allKeys = await this.storage.getAll()
-      const cacheEntries = Object.entries(allKeys)
-        .filter(([k]) => k.startsWith('cache:'))
-        .map(([k, v]) => ({ key: k, ...v as CacheEntry<any> }))
-        .sort((a, b) => a.timestamp - b.timestamp)
-      
-      // Remove oldest 20% of cache entries
-      const toRemove = Math.ceil(cacheEntries.length * 0.2)
-      for (let i = 0; i < toRemove; i++) {
-        await this.storage.remove(cacheEntries[i].key)
-      }
+    private async optimizeImage(url: string, options: any): Promise<string> {
+      // Implementation would use Canvas API to resize/compress
+      // This is a placeholder for the actual implementation
+      return url
     }
   }
   ```
@@ -282,114 +427,2252 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
   }
   ```
 
-#### Ticket 4.1.4: Create Feed Status Monitoring
-- **Description:** Build system to track feed health and performance metrics
-- **Story Points:** 1 SP
+#### Ticket 4.1.4: Advanced Feed Monitoring and Analytics
+- **Description:** Build comprehensive monitoring system with performance profiling, quality metrics, and user engagement tracking
+- **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Track last successful fetch time
-  - Monitor fetch duration and response times
-  - Calculate success/failure rates
-  - Store metrics in rolling window (last 24h)
-  - Expose health status to UI
+  - Performance profiling with detailed fetch timing breakdown
+  - Feed quality metrics (duplicate content, broken links, parse errors)
+  - User engagement tracking (views, clicks, time spent)
+  - Calculate success/failure rates with categorized error analysis
+  - Store metrics in rolling windows (1h, 24h, 7d, 30d)
+  - Real-time alerting thresholds with customizable triggers
+  - A/B testing framework for optimizing fetch intervals
+  - Historical trend analysis and anomaly detection
+  - Export metrics to external monitoring services
+  - Dashboard with visualizations and insights
 - **Dependencies:** 4.1.3
 - **Implementation Notes:**
   ```typescript
   // src/lib/feeds/FeedMonitor.ts
+  interface PerformanceProfile {
+    networkTime: number
+    parseTime: number
+    cacheTime: number
+    totalTime: number
+    memoryUsed: number
+    itemsProcessed: number
+  }
+  
+  interface QualityMetrics {
+    duplicateCount: number
+    brokenLinksCount: number
+    parseErrorCount: number
+    contentQualityScore: number
+    freshContentRatio: number
+  }
+  
+  interface EngagementMetrics {
+    views: number
+    clicks: number
+    avgTimeSpent: number
+    interactionRate: number
+    bookmarks: number
+  }
+  
   interface FeedMetrics {
     lastSuccess: number
     lastAttempt: number
     successRate: number
     avgResponseTime: number
-    status: 'healthy' | 'degraded' | 'down'
-    history: Array<{
+    status: 'healthy' | 'degraded' | 'down' | 'critical'
+    performance: PerformanceProfile
+    quality: QualityMetrics
+    engagement: EngagementMetrics
+    history: {
+      '1h': MetricWindow
+      '24h': MetricWindow
+      '7d': MetricWindow
+      '30d': MetricWindow
+    }
+    alerts: Alert[]
+  }
+  
+  interface MetricWindow {
+    dataPoints: Array<{
       timestamp: number
       success: boolean
       duration: number
+      performance?: PerformanceProfile
+      errors?: string[]
     }>
+    aggregates: {
+      successRate: number
+      avgDuration: number
+      p95Duration: number
+      errorBreakdown: Record<string, number>
+    }
   }
   
   export class FeedMonitor {
     private metrics = new Map<string, FeedMetrics>()
+    private alertThresholds: AlertThresholds
+    private abTests = new Map<string, ABTest>()
     
-    async recordFetch(
-      feedType: string, 
-      success: boolean, 
-      duration: number
-    ): Promise<void> {
-      const current = this.metrics.get(feedType) || this.createEmptyMetrics()
-      
-      // Update metrics
-      current.lastAttempt = Date.now()
-      if (success) current.lastSuccess = Date.now()
-      
-      // Add to history (keep last 24h)
-      current.history.push({
-        timestamp: Date.now(),
-        success,
-        duration
-      })
-      
-      // Remove old entries
-      const dayAgo = Date.now() - 24 * 60 * 60 * 1000
-      current.history = current.history.filter(h => h.timestamp > dayAgo)
-      
-      // Calculate success rate
-      const recentAttempts = current.history.slice(-20)
-      current.successRate = recentAttempts.filter(h => h.success).length / 
-                           recentAttempts.length
-      
-      // Calculate average response time
-      const successfulFetches = current.history.filter(h => h.success)
-      current.avgResponseTime = successfulFetches.length > 0
-        ? successfulFetches.reduce((sum, h) => sum + h.duration, 0) / 
-          successfulFetches.length
-        : 0
-      
-      // Determine status
-      current.status = this.determineStatus(current)
-      
-      this.metrics.set(feedType, current)
-      await this.storage.set(`feed-metrics:${feedType}`, current)
+    constructor(
+      private storage: Storage,
+      private analytics?: AnalyticsService
+    ) {
+      this.initializeMonitoring()
     }
     
-    private determineStatus(metrics: FeedMetrics): FeedMetrics['status'] {
-      const timeSinceSuccess = Date.now() - metrics.lastSuccess
+    async recordFetch(
+      feedType: string,
+      result: FetchResult,
+      profile: PerformanceProfile
+    ): Promise<void> {
+      const metrics = this.getOrCreateMetrics(feedType)
+      const timestamp = Date.now()
       
-      if (metrics.successRate >= 0.9 && timeSinceSuccess < 3600000) {
-        return 'healthy'
+      // Update basic metrics
+      metrics.lastAttempt = timestamp
+      if (result.success) metrics.lastSuccess = timestamp
+      
+      // Record performance profile
+      metrics.performance = this.updatePerformanceProfile(
+        metrics.performance,
+        profile
+      )
+      
+      // Update quality metrics if successful
+      if (result.success && result.data) {
+        metrics.quality = await this.analyzeQuality(result.data, feedType)
       }
-      if (metrics.successRate >= 0.5 || timeSinceSuccess < 7200000) {
-        return 'degraded'
+      
+      // Add to appropriate time windows
+      this.updateTimeWindows(metrics, {
+        timestamp,
+        success: result.success,
+        duration: profile.totalTime,
+        performance: profile,
+        errors: result.errors
+      })
+      
+      // Calculate aggregates
+      this.calculateAggregates(metrics)
+      
+      // Check alerts
+      await this.checkAlerts(feedType, metrics)
+      
+      // Run A/B tests
+      await this.runABTests(feedType, metrics)
+      
+      // Detect anomalies
+      await this.detectAnomalies(feedType, metrics)
+      
+      // Store metrics
+      await this.storage.set(`feed-metrics:${feedType}`, metrics)
+      
+      // Send to external monitoring
+      if (this.analytics) {
+        await this.analytics.track('feed_fetch', {
+          feedType,
+          success: result.success,
+          duration: profile.totalTime,
+          quality: metrics.quality.contentQualityScore
+        })
       }
-      return 'down'
+    }
+    
+    async recordEngagement(
+      feedType: string,
+      action: 'view' | 'click' | 'bookmark',
+      itemId?: string,
+      duration?: number
+    ): Promise<void> {
+      const metrics = this.getOrCreateMetrics(feedType)
+      
+      switch (action) {
+        case 'view':
+          metrics.engagement.views++
+          if (duration) {
+            metrics.engagement.avgTimeSpent = 
+              (metrics.engagement.avgTimeSpent * (metrics.engagement.views - 1) + duration) / 
+              metrics.engagement.views
+          }
+          break
+        case 'click':
+          metrics.engagement.clicks++
+          break
+        case 'bookmark':
+          metrics.engagement.bookmarks++
+          break
+      }
+      
+      // Calculate interaction rate
+      metrics.engagement.interactionRate = 
+        (metrics.engagement.clicks + metrics.engagement.bookmarks) / 
+        Math.max(metrics.engagement.views, 1)
+      
+      await this.storage.set(`feed-metrics:${feedType}`, metrics)
+    }
+    
+    private async analyzeQuality(
+      data: FeedItem[],
+      feedType: string
+    ): Promise<QualityMetrics> {
+      const quality: QualityMetrics = {
+        duplicateCount: 0,
+        brokenLinksCount: 0,
+        parseErrorCount: 0,
+        contentQualityScore: 0,
+        freshContentRatio: 0
+      }
+      
+      // Check for duplicates
+      const uniqueIds = new Set<string>()
+      const uniqueContent = new Set<string>()
+      
+      for (const item of data) {
+        if (uniqueIds.has(item.id)) {
+          quality.duplicateCount++
+        }
+        uniqueIds.add(item.id)
+        
+        // Content hash for near-duplicate detection
+        const contentHash = this.hashContent(item.title + item.description)
+        if (uniqueContent.has(contentHash)) {
+          quality.duplicateCount++
+        }
+        uniqueContent.add(contentHash)
+        
+        // Check for broken links (would be async in real implementation)
+        if (!item.url || item.url.includes('undefined')) {
+          quality.brokenLinksCount++
+        }
+        
+        // Check parse quality
+        if (!item.title || !item.description) {
+          quality.parseErrorCount++
+        }
+      }
+      
+      // Calculate content quality score (0-100)
+      quality.contentQualityScore = Math.round(
+        100 * (1 - (quality.duplicateCount + quality.brokenLinksCount + quality.parseErrorCount) / 
+        Math.max(data.length, 1))
+      )
+      
+      // Calculate fresh content ratio (items from last 24h)
+      const dayAgo = Date.now() - 24 * 60 * 60 * 1000
+      const freshItems = data.filter(item => item.publishedAt > dayAgo).length
+      quality.freshContentRatio = freshItems / Math.max(data.length, 1)
+      
+      return quality
+    }
+    
+    private async checkAlerts(
+      feedType: string,
+      metrics: FeedMetrics
+    ): Promise<void> {
+      const alerts: Alert[] = []
+      
+      // Performance alerts
+      if (metrics.avgResponseTime > this.alertThresholds.maxResponseTime) {
+        alerts.push({
+          type: 'performance',
+          severity: 'warning',
+          message: `Average response time (${metrics.avgResponseTime}ms) exceeds threshold`,
+          timestamp: Date.now()
+        })
+      }
+      
+      // Quality alerts
+      if (metrics.quality.contentQualityScore < this.alertThresholds.minQualityScore) {
+        alerts.push({
+          type: 'quality',
+          severity: 'error',
+          message: `Content quality score (${metrics.quality.contentQualityScore}) below threshold`,
+          timestamp: Date.now()
+        })
+      }
+      
+      // Availability alerts
+      if (metrics.successRate < this.alertThresholds.minSuccessRate) {
+        alerts.push({
+          type: 'availability',
+          severity: 'critical',
+          message: `Success rate (${metrics.successRate}%) critically low`,
+          timestamp: Date.now()
+        })
+      }
+      
+      // Store and notify
+      metrics.alerts = alerts
+      if (alerts.length > 0) {
+        await this.notifyAlerts(feedType, alerts)
+      }
+    }
+    
+    private async runABTests(
+      feedType: string,
+      metrics: FeedMetrics
+    ): Promise<void> {
+      const test = this.abTests.get(feedType)
+      if (!test || !test.active) return
+      
+      // Determine variant based on current config
+      const variant = Math.random() < 0.5 ? 'control' : 'test'
+      
+      // Apply variant config (e.g., different fetch intervals)
+      if (variant === 'test') {
+        await this.applyTestConfig(feedType, test.testConfig)
+      }
+      
+      // Record results
+      test.results[variant].samples++
+      test.results[variant].avgPerformance = 
+        (test.results[variant].avgPerformance * (test.results[variant].samples - 1) + 
+         metrics.avgResponseTime) / test.results[variant].samples
+      
+      // Check for statistical significance
+      if (test.results.control.samples > 100 && test.results.test.samples > 100) {
+        const improvement = 
+          (test.results.control.avgPerformance - test.results.test.avgPerformance) / 
+          test.results.control.avgPerformance
+        
+        if (Math.abs(improvement) > 0.1) { // 10% improvement threshold
+          await this.concludeABTest(feedType, test, improvement > 0)
+        }
+      }
+    }
+    
+    async exportMetrics(format: 'json' | 'csv' | 'prometheus'): Promise<string> {
+      const allMetrics = Array.from(this.metrics.entries())
+      
+      switch (format) {
+        case 'json':
+          return JSON.stringify(allMetrics, null, 2)
+        case 'csv':
+          return this.convertToCSV(allMetrics)
+        case 'prometheus':
+          return this.convertToPrometheus(allMetrics)
+        default:
+          throw new Error(`Unsupported format: ${format}`)
+      }
+    }
+    
+    getDashboardData(): DashboardData {
+      const feeds = Array.from(this.metrics.entries())
+      
+      return {
+        overview: {
+          totalFeeds: feeds.length,
+          healthyFeeds: feeds.filter(([_, m]) => m.status === 'healthy').length,
+          avgResponseTime: this.calculateGlobalAvg(feeds, 'avgResponseTime'),
+          totalEngagement: this.calculateTotalEngagement(feeds)
+        },
+        feeds: feeds.map(([type, metrics]) => ({
+          type,
+          status: metrics.status,
+          performance: metrics.performance,
+          quality: metrics.quality,
+          engagement: metrics.engagement,
+          trend: this.calculateTrend(metrics)
+        })),
+        alerts: this.getAllActiveAlerts(feeds),
+        insights: this.generateInsights(feeds)
+      }
     }
   }
   ```
 
+#### Ticket 4.1.5: FeedManager Orchestration
+- **Description:** Implement central FeedManager class to coordinate all feed operations with intelligent prioritization and resource management
+- **Story Points:** 3 SP
+- **Technical Requirements:**
+  - Create unified feed item interface for all feed types
+  - Implement feed deduplication across different sources
+  - Build priority queue for critical vs non-critical feeds
+  - Add memory management with LRU eviction for feed items
+  - Create feed aggregation and sorting strategies
+  - Implement feed coordination to prevent simultaneous fetches
+  - Add resource pooling for network connections
+  - Support dynamic feed registration and removal
+  - Create feed dependency management
+  - Implement backpressure handling for slow consumers
+- **Dependencies:** 4.1.1, 4.1.2, 4.1.3, 4.1.4
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/feeds/FeedManager.ts
+  interface UnifiedFeedItem {
+    id: string
+    sourceType: 'product-hunt' | 'hacker-news' | 'jira' | 'rss'
+    sourceId: string
+    title: string
+    description: string
+    url: string
+    author: {
+      name: string
+      avatar?: string
+    }
+    publishedAt: number
+    updatedAt: number
+    engagement: {
+      views?: number
+      votes?: number
+      comments?: number
+    }
+    metadata: Record<string, any>
+    contentHash: string
+  }
+  
+  interface FeedConfig {
+    id: string
+    type: string
+    priority: 'critical' | 'high' | 'medium' | 'low'
+    interval: number
+    maxItems: number
+    dependencies?: string[]
+    filters?: FeedFilter[]
+    transform?: (data: any) => UnifiedFeedItem[]
+  }
+  
+  export class FeedManager {
+    private feeds = new Map<string, FeedConfig>()
+    private feedQueue = new PriorityQueue<FeedTask>()
+    private activeFeeds = new Set<string>()
+    private feedItems = new LRUCache<string, UnifiedFeedItem>(10000)
+    private dedupeIndex = new Map<string, Set<string>>() // contentHash -> feedIds
+    
+    constructor(
+      private storage: Storage,
+      private cache: FeedCache,
+      private monitor: FeedMonitor,
+      private errorHandler: FeedErrorHandler
+    ) {
+      this.initialize()
+    }
+    
+    async registerFeed(config: FeedConfig): Promise<void> {
+      // Validate dependencies
+      if (config.dependencies) {
+        for (const dep of config.dependencies) {
+          if (!this.feeds.has(dep)) {
+            throw new Error(`Dependency ${dep} not found`)
+          }
+        }
+      }
+      
+      this.feeds.set(config.id, config)
+      
+      // Schedule initial fetch based on priority
+      const delay = this.calculateInitialDelay(config.priority)
+      this.scheduleFetch(config.id, delay)
+    }
+    
+    async fetchFeed(feedId: string): Promise<UnifiedFeedItem[]> {
+      const config = this.feeds.get(feedId)
+      if (!config) {
+        throw new Error(`Feed ${feedId} not registered`)
+      }
+      
+      // Check if feed is already being fetched
+      if (this.activeFeeds.has(feedId)) {
+        console.log(`Feed ${feedId} already being fetched, skipping`)
+        return []
+      }
+      
+      // Check dependencies
+      if (config.dependencies) {
+        const pendingDeps = config.dependencies.filter(dep => 
+          !this.isFeedReady(dep)
+        )
+        if (pendingDeps.length > 0) {
+          console.log(`Feed ${feedId} waiting for dependencies:`, pendingDeps)
+          this.requeueFeed(feedId, 60000) // Retry in 1 minute
+          return []
+        }
+      }
+      
+      this.activeFeeds.add(feedId)
+      const startTime = performance.now()
+      
+      try {
+        // Check cache with ETag
+        const cached = await this.cache.get(feedId, {
+          staleWhileRevalidate: true
+        })
+        
+        if (cached.data && !cached.stale) {
+          return cached.data as UnifiedFeedItem[]
+        }
+        
+        // Fetch fresh data
+        const fetcher = this.getFetcher(config.type)
+        const rawData = await fetcher(feedId, {
+          etag: cached.etag,
+          maxItems: config.maxItems
+        })
+        
+        // Transform to unified format
+        const items = config.transform 
+          ? config.transform(rawData)
+          : this.defaultTransform(config.type, rawData)
+        
+        // Apply filters
+        const filtered = this.applyFilters(items, config.filters)
+        
+        // Deduplicate
+        const deduped = await this.deduplicateItems(filtered, feedId)
+        
+        // Store in cache
+        await this.cache.set(feedId, deduped, {
+          compress: true,
+          ttl: config.interval * 60 * 1000,
+          maxSize: 1024 * 1024,
+          staleWhileRevalidate: true
+        })
+        
+        // Update feed items in memory
+        this.updateFeedItems(deduped, feedId)
+        
+        // Record metrics
+        const duration = performance.now() - startTime
+        await this.monitor.recordFetch(feedId, {
+          success: true,
+          data: deduped
+        }, {
+          networkTime: duration * 0.6,
+          parseTime: duration * 0.3,
+          cacheTime: duration * 0.1,
+          totalTime: duration,
+          memoryUsed: this.estimateMemoryUsage(deduped),
+          itemsProcessed: deduped.length
+        })
+        
+        return deduped
+        
+      } catch (error) {
+        // Handle error
+        const shouldRetry = await this.errorHandler.handleError(feedId, error)
+        if (shouldRetry) {
+          const retryDelay = this.calculateRetryDelay(config.priority)
+          this.scheduleFetch(feedId, retryDelay)
+        }
+        
+        throw error
+        
+      } finally {
+        this.activeFeeds.delete(feedId)
+      }
+    }
+    
+    private async deduplicateItems(
+      items: UnifiedFeedItem[],
+      feedId: string
+    ): Promise<UnifiedFeedItem[]> {
+      const deduped: UnifiedFeedItem[] = []
+      
+      for (const item of items) {
+        const hash = this.calculateContentHash(item)
+        item.contentHash = hash
+        
+        // Check if we've seen this content before
+        const existingFeeds = this.dedupeIndex.get(hash)
+        if (existingFeeds && existingFeeds.size > 0) {
+          // Content exists in other feeds
+          console.log(`Duplicate content found in feeds:`, Array.from(existingFeeds))
+          
+          // Still add if it's from a higher priority feed
+          const currentPriority = this.feeds.get(feedId)?.priority || 'low'
+          const shouldKeep = this.shouldKeepDuplicate(currentPriority, existingFeeds)
+          
+          if (!shouldKeep) continue
+        }
+        
+        // Add to dedupe index
+        if (!existingFeeds) {
+          this.dedupeIndex.set(hash, new Set([feedId]))
+        } else {
+          existingFeeds.add(feedId)
+        }
+        
+        deduped.push(item)
+      }
+      
+      return deduped
+    }
+    
+    async getAggregatedFeed(options: {
+      types?: string[]
+      limit?: number
+      since?: number
+      sortBy?: 'date' | 'engagement' | 'relevance'
+    } = {}): Promise<UnifiedFeedItem[]> {
+      const { 
+        types = Array.from(this.feeds.keys()),
+        limit = 50,
+        since = Date.now() - 24 * 60 * 60 * 1000,
+        sortBy = 'date'
+      } = options
+      
+      // Collect items from requested feed types
+      const allItems: UnifiedFeedItem[] = []
+      
+      for (const feedId of types) {
+        const items = this.getFeedItemsFromMemory(feedId)
+          .filter(item => item.publishedAt > since)
+        allItems.push(...items)
+      }
+      
+      // Remove duplicates across feeds
+      const uniqueItems = this.removeCrossFeedDuplicates(allItems)
+      
+      // Sort items
+      const sorted = this.sortItems(uniqueItems, sortBy)
+      
+      // Apply limit
+      return sorted.slice(0, limit)
+    }
+    
+    private sortItems(
+      items: UnifiedFeedItem[],
+      sortBy: 'date' | 'engagement' | 'relevance'
+    ): UnifiedFeedItem[] {
+      switch (sortBy) {
+        case 'date':
+          return items.sort((a, b) => b.publishedAt - a.publishedAt)
+          
+        case 'engagement':
+          return items.sort((a, b) => {
+            const scoreA = (a.engagement.votes || 0) + 
+                          (a.engagement.comments || 0) * 2
+            const scoreB = (b.engagement.votes || 0) + 
+                          (b.engagement.comments || 0) * 2
+            return scoreB - scoreA
+          })
+          
+        case 'relevance':
+          // Implement relevance scoring based on user preferences
+          return this.sortByRelevance(items)
+          
+        default:
+          return items
+      }
+    }
+    
+    private scheduleFetch(feedId: string, delayMs: number): void {
+      const config = this.feeds.get(feedId)
+      if (!config) return
+      
+      const task: FeedTask = {
+        feedId,
+        priority: config.priority,
+        scheduledTime: Date.now() + delayMs,
+        execute: () => this.fetchFeed(feedId)
+      }
+      
+      this.feedQueue.enqueue(task)
+      
+      // Process queue
+      this.processQueue()
+    }
+    
+    private async processQueue(): Promise<void> {
+      if (this.isProcessingQueue) return
+      this.isProcessingQueue = true
+      
+      while (!this.feedQueue.isEmpty()) {
+        const task = this.feedQueue.peek()
+        
+        // Check if it's time to execute
+        if (task.scheduledTime > Date.now()) {
+          // Schedule next check
+          setTimeout(() => this.processQueue(), task.scheduledTime - Date.now())
+          break
+        }
+        
+        // Check resource constraints
+        if (this.activeFeeds.size >= this.maxConcurrentFeeds) {
+          // Wait for a feed to complete
+          setTimeout(() => this.processQueue(), 1000)
+          break
+        }
+        
+        // Execute task
+        this.feedQueue.dequeue()
+        task.execute().catch(error => {
+          console.error(`Feed task failed for ${task.feedId}:`, error)
+        })
+      }
+      
+      this.isProcessingQueue = false
+    }
+    
+    // Memory management
+    private updateFeedItems(items: UnifiedFeedItem[], feedId: string): void {
+      const feedKey = `feed:${feedId}`
+      const existingIds = new Set(
+        this.getFeedItemsFromMemory(feedId).map(item => item.id)
+      )
+      
+      for (const item of items) {
+        const itemKey = `${feedKey}:${item.id}`
+        
+        // Update LRU cache
+        this.feedItems.set(itemKey, item)
+        
+        // Track new items
+        if (!existingIds.has(item.id)) {
+          this.emit('newItem', { feedId, item })
+        }
+      }
+      
+      // Clean up old items if memory pressure
+      if (this.feedItems.size > this.feedItems.maxSize * 0.9) {
+        this.performMemoryCleanup()
+      }
+    }
+    
+    private performMemoryCleanup(): void {
+      // Remove least recently used items
+      const itemsToRemove = Math.floor(this.feedItems.maxSize * 0.1)
+      const removed = this.feedItems.prune(itemsToRemove)
+      
+      // Update dedupe index
+      for (const item of removed) {
+        const feeds = this.dedupeIndex.get(item.contentHash)
+        if (feeds) {
+          feeds.delete(item.sourceId)
+          if (feeds.size === 0) {
+            this.dedupeIndex.delete(item.contentHash)
+          }
+        }
+      }
+      
+      console.log(`Memory cleanup: removed ${removed.length} items`)
+    }
+  }
+  ```
+
+#### Ticket 4.1.6: Network Resilience and Offline Support
+- **Description:** Implement comprehensive network resilience with offline capabilities and graceful degradation
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Implement network connectivity detection and monitoring
+  - Add circuit breaker pattern for failing endpoints
+  - Create request queuing with offline persistence
+  - Handle browser suspension and hibernation events
+  - Implement progressive enhancement for slow connections
+  - Add offline-first architecture with background sync
+  - Create network quality detection and adaptation
+  - Implement request prioritization during poor connectivity
+  - Add automatic retry with intelligent backoff
+  - Support partial content loading and progressive rendering
+- **Dependencies:** 4.1.3, 4.1.5
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/feeds/NetworkResilience.ts
+  interface NetworkState {
+    online: boolean
+    effectiveType: '4g' | '3g' | '2g' | 'slow-2g' | 'unknown'
+    downlink: number // Mbps
+    rtt: number // Round trip time in ms
+    saveData: boolean
+  }
+  
+  interface CircuitBreakerConfig {
+    failureThreshold: number
+    resetTimeout: number
+    halfOpenRequests: number
+  }
+  
+  export class NetworkResilience {
+    private networkState: NetworkState
+    private circuitBreakers = new Map<string, CircuitBreaker>()
+    private offlineQueue = new PersistentQueue<QueuedRequest>('offline-requests')
+    private activeRequests = new Map<string, AbortController>()
+    
+    constructor(
+      private storage: Storage,
+      private monitor: FeedMonitor
+    ) {
+      this.initializeNetworkMonitoring()
+    }
+    
+    private initializeNetworkMonitoring(): void {
+      // Monitor online/offline events
+      window.addEventListener('online', () => this.handleOnline())
+      window.addEventListener('offline', () => this.handleOffline())
+      
+      // Monitor connection changes
+      if ('connection' in navigator) {
+        const connection = (navigator as any).connection
+        connection.addEventListener('change', () => this.updateNetworkState())
+        this.updateNetworkState()
+      }
+      
+      // Handle page visibility changes
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.handleResume()
+        } else {
+          this.handleSuspend()
+        }
+      })
+      
+      // Handle browser hibernation
+      let lastActiveTime = Date.now()
+      setInterval(() => {
+        const now = Date.now()
+        const timeDiff = now - lastActiveTime
+        
+        if (timeDiff > 10000) { // More than 10 seconds
+          console.log('Detected browser hibernation, reinitializing...')
+          this.handleHibernationRecovery(timeDiff)
+        }
+        
+        lastActiveTime = now
+      }, 5000)
+    }
+    
+    async makeResilientRequest(
+      url: string,
+      options: RequestInit & { 
+        priority?: 'high' | 'medium' | 'low'
+        retryable?: boolean
+        offlineCache?: boolean
+      } = {}
+    ): Promise<Response> {
+      const { priority = 'medium', retryable = true, offlineCache = true } = options
+      
+      // Check network state
+      if (!this.networkState.online && offlineCache) {
+        return this.handleOfflineRequest(url, options)
+      }
+      
+      // Check circuit breaker
+      const domain = new URL(url).hostname
+      const breaker = this.getOrCreateCircuitBreaker(domain)
+      
+      if (breaker.state === 'open') {
+        throw new Error(`Circuit breaker open for ${domain}`)
+      }
+      
+      // Adapt request based on network quality
+      const adaptedOptions = this.adaptRequestToNetwork(options)
+      
+      // Create abort controller for timeout
+      const controller = new AbortController()
+      const timeout = this.calculateTimeout()
+      const timeoutId = setTimeout(() => controller.abort(), timeout)
+      
+      try {
+        const requestId = this.generateRequestId()
+        this.activeRequests.set(requestId, controller)
+        
+        const response = await fetch(url, {
+          ...adaptedOptions,
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeoutId)
+        this.activeRequests.delete(requestId)
+        
+        // Record success
+        breaker.recordSuccess()
+        
+        // Cache response if needed
+        if (offlineCache && response.ok) {
+          await this.cacheResponse(url, response.clone())
+        }
+        
+        return response
+        
+      } catch (error) {
+        clearTimeout(timeoutId)
+        
+        // Record failure
+        breaker.recordFailure()
+        
+        // Handle different error types
+        if (error.name === 'AbortError') {
+          throw new Error('Request timeout')
+        }
+        
+        if (retryable && this.shouldRetry(error)) {
+          return this.retryWithBackoff(url, options, error)
+        }
+        
+        // Queue for offline if appropriate
+        if (!this.networkState.online && retryable) {
+          await this.queueOfflineRequest(url, options)
+          throw new Error('Request queued for offline processing')
+        }
+        
+        throw error
+      }
+    }
+    
+    private adaptRequestToNetwork(options: RequestInit): RequestInit {
+      const adapted = { ...options }
+      
+      // Adjust based on connection type
+      switch (this.networkState.effectiveType) {
+        case 'slow-2g':
+        case '2g':
+          // Request minimal data
+          adapted.headers = {
+            ...adapted.headers,
+            'Accept': 'application/json',
+            'X-Requested-Quality': 'minimal'
+          }
+          break
+          
+        case '3g':
+          // Request reduced data
+          adapted.headers = {
+            ...adapted.headers,
+            'X-Requested-Quality': 'reduced'
+          }
+          break
+          
+        case '4g':
+        default:
+          // Full quality
+          break
+      }
+      
+      // Honor save data preference
+      if (this.networkState.saveData) {
+        adapted.headers = {
+          ...adapted.headers,
+          'Save-Data': 'on'
+        }
+      }
+      
+      return adapted
+    }
+    
+    private async handleOfflineRequest(
+      url: string,
+      options: RequestInit
+    ): Promise<Response> {
+      // Try to serve from cache first
+      const cached = await this.getCachedResponse(url)
+      if (cached) {
+        return new Response(cached.body, {
+          status: 200,
+          statusText: 'OK (from cache)',
+          headers: {
+            ...cached.headers,
+            'X-From-Cache': 'true',
+            'X-Cache-Age': String(Date.now() - cached.timestamp)
+          }
+        })
+      }
+      
+      // Queue for later if not cached
+      await this.queueOfflineRequest(url, options)
+      
+      return new Response(null, {
+        status: 503,
+        statusText: 'Offline - Request Queued'
+      })
+    }
+    
+    private async queueOfflineRequest(
+      url: string,
+      options: RequestInit
+    ): Promise<void> {
+      const request: QueuedRequest = {
+        id: this.generateRequestId(),
+        url,
+        options,
+        timestamp: Date.now(),
+        retryCount: 0,
+        priority: options.priority || 'medium'
+      }
+      
+      await this.offlineQueue.enqueue(request)
+      
+      // Show notification to user
+      this.notifyOfflineQueue(request)
+    }
+    
+    private async processOfflineQueue(): Promise<void> {
+      if (!this.networkState.online) return
+      
+      const requests = await this.offlineQueue.getAll()
+      const prioritized = this.prioritizeRequests(requests)
+      
+      for (const request of prioritized) {
+        try {
+          const response = await fetch(request.url, request.options)
+          
+          if (response.ok) {
+            await this.offlineQueue.remove(request.id)
+            this.notifyRequestCompleted(request)
+          } else {
+            request.retryCount++
+            if (request.retryCount >= 3) {
+              await this.offlineQueue.remove(request.id)
+              this.notifyRequestFailed(request)
+            } else {
+              await this.offlineQueue.update(request)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to process offline request:', error)
+        }
+      }
+    }
+    
+    private getOrCreateCircuitBreaker(domain: string): CircuitBreaker {
+      if (!this.circuitBreakers.has(domain)) {
+        const breaker = new CircuitBreaker({
+          failureThreshold: 5,
+          resetTimeout: 60000, // 1 minute
+          halfOpenRequests: 3
+        })
+        
+        this.circuitBreakers.set(domain, breaker)
+      }
+      
+      return this.circuitBreakers.get(domain)!
+    }
+    
+    private async retryWithBackoff(
+      url: string,
+      options: RequestInit,
+      error: Error,
+      attempt = 1
+    ): Promise<Response> {
+      const maxAttempts = 3
+      const baseDelay = 1000
+      
+      if (attempt > maxAttempts) {
+        throw error
+      }
+      
+      // Calculate exponential backoff with jitter
+      const delay = Math.min(
+        baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000,
+        10000
+      )
+      
+      console.log(`Retrying request to ${url} in ${delay}ms (attempt ${attempt})`)
+      
+      await new Promise(resolve => setTimeout(resolve, delay))
+      
+      try {
+        return await this.makeResilientRequest(url, {
+          ...options,
+          retryable: false // Prevent infinite recursion
+        })
+      } catch (retryError) {
+        return this.retryWithBackoff(url, options, retryError, attempt + 1)
+      }
+    }
+    
+    private calculateTimeout(): number {
+      // Adjust timeout based on network conditions
+      const baseTimeout = 30000 // 30 seconds
+      
+      switch (this.networkState.effectiveType) {
+        case 'slow-2g':
+          return baseTimeout * 3
+        case '2g':
+          return baseTimeout * 2
+        case '3g':
+          return baseTimeout * 1.5
+        default:
+          return baseTimeout
+      }
+    }
+    
+    private handleOnline(): void {
+      console.log('Network: Online')
+      this.networkState.online = true
+      
+      // Process offline queue
+      this.processOfflineQueue()
+      
+      // Reset circuit breakers gradually
+      this.circuitBreakers.forEach(breaker => {
+        breaker.halfOpen()
+      })
+      
+      // Notify components
+      this.emit('network-state-change', { online: true })
+    }
+    
+    private handleOffline(): void {
+      console.log('Network: Offline')
+      this.networkState.online = false
+      
+      // Cancel active requests
+      this.activeRequests.forEach(controller => {
+        controller.abort()
+      })
+      this.activeRequests.clear()
+      
+      // Notify components
+      this.emit('network-state-change', { online: false })
+    }
+    
+    private handleHibernationRecovery(suspendDuration: number): void {
+      console.log(`Recovering from ${suspendDuration}ms hibernation`)
+      
+      // Reset circuit breakers
+      this.circuitBreakers.forEach(breaker => {
+        breaker.reset()
+      })
+      
+      // Update network state
+      this.updateNetworkState()
+      
+      // Emit recovery event
+      this.emit('hibernation-recovery', { duration: suspendDuration })
+    }
+    
+    async getNetworkQuality(): Promise<{
+      quality: 'excellent' | 'good' | 'fair' | 'poor'
+      recommendation: string
+    }> {
+      if (!this.networkState.online) {
+        return {
+          quality: 'poor',
+          recommendation: 'Currently offline. Cached content only.'
+        }
+      }
+      
+      const { effectiveType, downlink, rtt } = this.networkState
+      
+      if (effectiveType === '4g' && downlink > 5 && rtt < 100) {
+        return {
+          quality: 'excellent',
+          recommendation: 'Full quality content available'
+        }
+      }
+      
+      if (effectiveType === '3g' || (downlink > 1 && rtt < 300)) {
+        return {
+          quality: 'good',
+          recommendation: 'Standard quality recommended'
+        }
+      }
+      
+      if (effectiveType === '2g' || downlink < 1) {
+        return {
+          quality: 'fair',
+          recommendation: 'Reduced quality for faster loading'
+        }
+      }
+      
+      return {
+        quality: 'poor',
+        recommendation: 'Minimal data mode active'
+      }
+    }
+  }
+  
+  class CircuitBreaker {
+    state: 'closed' | 'open' | 'half-open' = 'closed'
+    private failures = 0
+    private lastFailureTime = 0
+    private successesInHalfOpen = 0
+    
+    constructor(private config: CircuitBreakerConfig) {}
+    
+    recordSuccess(): void {
+      if (this.state === 'half-open') {
+        this.successesInHalfOpen++
+        if (this.successesInHalfOpen >= this.config.halfOpenRequests) {
+          this.close()
+        }
+      }
+      this.failures = 0
+    }
+    
+    recordFailure(): void {
+      this.failures++
+      this.lastFailureTime = Date.now()
+      
+      if (this.failures >= this.config.failureThreshold) {
+        this.open()
+      }
+    }
+    
+    private open(): void {
+      this.state = 'open'
+      setTimeout(() => this.halfOpen(), this.config.resetTimeout)
+    }
+    
+    halfOpen(): void {
+      this.state = 'half-open'
+      this.successesInHalfOpen = 0
+    }
+    
+    private close(): void {
+      this.state = 'closed'
+      this.failures = 0
+    }
+    
+    reset(): void {
+      this.close()
+    }
+  }
+  ```
+
+#### Ticket 4.1.7: Security & Privacy Layer
+- **Description:** Implement comprehensive security measures for feed fetching with privacy-preserving features
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Implement CORS proxy for feeds that don't support cross-origin requests
+  - Add advanced content sanitization (XSS prevention)
+  - Create rate limiting per domain to avoid being blocked
+  - Implement user agent rotation and request header randomization
+  - Add privacy-preserving analytics (no PII logging)
+  - Support authenticated feeds with secure credential storage
+  - Implement content validation and malicious payload detection
+  - Add request signing for API authentication
+  - Create audit logging for security events
+  - Implement feed source verification
+- **Dependencies:** 4.1.5, 4.1.6
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/feeds/SecurityLayer.ts
+  import DOMPurify from 'isomorphic-dompurify'
+  import { createHash, randomBytes } from 'crypto'
+  
+  interface SecurityConfig {
+    corsProxy?: string
+    rateLimits: Map<string, RateLimit>
+    userAgents: string[]
+    allowedDomains?: string[]
+    blockedDomains?: string[]
+    contentSecurityPolicy: ContentSecurityPolicy
+  }
+  
+  interface RateLimit {
+    requests: number
+    window: number // milliseconds
+    burst?: number
+  }
+  
+  export class SecurityLayer {
+    private requestCounts = new Map<string, RequestTracker>()
+    private corsProxyUrl: string
+    private auditLog: AuditLogger
+    
+    constructor(
+      private config: SecurityConfig,
+      private storage: Storage,
+      private monitor: FeedMonitor
+    ) {
+      this.corsProxyUrl = config.corsProxy || this.setupInternalProxy()
+      this.auditLog = new AuditLogger(storage)
+    }
+    
+    async secureRequest(
+      url: string,
+      options: RequestInit = {},
+      feedConfig?: {
+        requiresAuth?: boolean
+        credentials?: string
+        validateContent?: boolean
+      }
+    ): Promise<Response> {
+      // Validate URL and domain
+      const validatedUrl = await this.validateAndSanitizeUrl(url)
+      
+      // Check rate limits
+      await this.checkRateLimit(validatedUrl)
+      
+      // Prepare secure headers
+      const secureOptions = await this.prepareSecureRequest(options, feedConfig)
+      
+      // Determine if CORS proxy is needed
+      const finalUrl = this.needsCorsProxy(validatedUrl) 
+        ? this.buildProxyUrl(validatedUrl)
+        : validatedUrl
+      
+      try {
+        // Make request
+        const response = await fetch(finalUrl, secureOptions)
+        
+        // Validate response
+        await this.validateResponse(response, feedConfig?.validateContent)
+        
+        // Log successful request
+        await this.auditLog.logRequest({
+          url: validatedUrl,
+          status: response.status,
+          timestamp: Date.now(),
+          success: true
+        })
+        
+        return response
+        
+      } catch (error) {
+        // Log failed request
+        await this.auditLog.logRequest({
+          url: validatedUrl,
+          error: error.message,
+          timestamp: Date.now(),
+          success: false
+        })
+        
+        throw error
+      }
+    }
+    
+    async sanitizeContent(
+      content: string,
+      type: 'html' | 'json' | 'xml'
+    ): Promise<string> {
+      switch (type) {
+        case 'html':
+          return this.sanitizeHtml(content)
+          
+        case 'json':
+          return this.sanitizeJson(content)
+          
+        case 'xml':
+          return this.sanitizeXml(content)
+          
+        default:
+          throw new Error(`Unsupported content type: ${type}`)
+      }
+    }
+    
+    private sanitizeHtml(html: string): string {
+      // Configure DOMPurify for maximum safety
+      const config = {
+        ALLOWED_TAGS: [
+          'p', 'br', 'strong', 'em', 'a', 'img', 
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'ul', 'ol', 'li', 'blockquote', 'code', 'pre'
+        ],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+        ALLOW_DATA_ATTR: false,
+        ALLOW_UNKNOWN_PROTOCOLS: false,
+        SAFE_FOR_TEMPLATES: true,
+        WHOLE_DOCUMENT: false,
+        RETURN_DOM: false,
+        RETURN_DOM_FRAGMENT: false,
+        FORCE_BODY: true,
+        SANITIZE_DOM: true,
+        KEEP_CONTENT: true,
+        FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
+        FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
+      }
+      
+      // Additional custom sanitization
+      let sanitized = DOMPurify.sanitize(html, config)
+      
+      // Remove any remaining suspicious patterns
+      sanitized = this.removeSupiciousPatterns(sanitized)
+      
+      return sanitized
+    }
+    
+    private sanitizeJson(jsonStr: string): string {
+      try {
+        const parsed = JSON.parse(jsonStr)
+        
+        // Recursively sanitize all string values
+        const sanitized = this.sanitizeJsonObject(parsed)
+        
+        return JSON.stringify(sanitized)
+      } catch (error) {
+        throw new Error('Invalid JSON content')
+      }
+    }
+    
+    private sanitizeJsonObject(obj: any): any {
+      if (typeof obj === 'string') {
+        // Remove potential XSS vectors from strings
+        return this.sanitizeString(obj)
+      }
+      
+      if (Array.isArray(obj)) {
+        return obj.map(item => this.sanitizeJsonObject(item))
+      }
+      
+      if (typeof obj === 'object' && obj !== null) {
+        const sanitized: any = {}
+        for (const [key, value] of Object.entries(obj)) {
+          // Sanitize keys as well
+          const safeKey = this.sanitizeString(key)
+          sanitized[safeKey] = this.sanitizeJsonObject(value)
+        }
+        return sanitized
+      }
+      
+      return obj
+    }
+    
+    private async validateAndSanitizeUrl(url: string): Promise<string> {
+      try {
+        const parsed = new URL(url)
+        
+        // Check protocol
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          throw new Error('Invalid protocol')
+        }
+        
+        // Check against allowed/blocked domains
+        if (this.config.blockedDomains?.includes(parsed.hostname)) {
+          throw new Error('Domain is blocked')
+        }
+        
+        if (this.config.allowedDomains && 
+            !this.config.allowedDomains.includes(parsed.hostname)) {
+          throw new Error('Domain not in allowlist')
+        }
+        
+        // Remove suspicious query parameters
+        const suspiciousParams = ['callback', 'jsonp', '_', 'eval']
+        suspiciousParams.forEach(param => {
+          parsed.searchParams.delete(param)
+        })
+        
+        return parsed.toString()
+        
+      } catch (error) {
+        throw new Error(`Invalid URL: ${error.message}`)
+      }
+    }
+    
+    private async checkRateLimit(url: string): Promise<void> {
+      const domain = new URL(url).hostname
+      const limit = this.config.rateLimits.get(domain) || {
+        requests: 60,
+        window: 60000 // 1 minute
+      }
+      
+      const tracker = this.getOrCreateTracker(domain)
+      const now = Date.now()
+      
+      // Clean old entries
+      tracker.requests = tracker.requests.filter(
+        time => now - time < limit.window
+      )
+      
+      // Check if limit exceeded
+      if (tracker.requests.length >= limit.requests) {
+        const oldestRequest = Math.min(...tracker.requests)
+        const waitTime = limit.window - (now - oldestRequest)
+        
+        throw new Error(
+          `Rate limit exceeded for ${domain}. Retry in ${Math.ceil(waitTime / 1000)}s`
+        )
+      }
+      
+      // Add current request
+      tracker.requests.push(now)
+    }
+    
+    private async prepareSecureRequest(
+      options: RequestInit,
+      feedConfig?: any
+    ): Promise<RequestInit> {
+      const secureOptions = { ...options }
+      
+      // Rotate user agent
+      const userAgent = this.selectUserAgent()
+      
+      // Build secure headers
+      secureOptions.headers = {
+        ...secureOptions.headers,
+        'User-Agent': userAgent,
+        'Accept': 'application/json, application/xml, text/html',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'DNT': '1',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site'
+      }
+      
+      // Add authentication if needed
+      if (feedConfig?.requiresAuth && feedConfig?.credentials) {
+        const authHeader = await this.getAuthHeader(feedConfig.credentials)
+        secureOptions.headers['Authorization'] = authHeader
+      }
+      
+      // Add request signing if configured
+      if (feedConfig?.signRequests) {
+        const signature = await this.signRequest(options)
+        secureOptions.headers['X-Request-Signature'] = signature
+      }
+      
+      // Randomize header order (implementation specific)
+      secureOptions.headers = this.randomizeHeaderOrder(secureOptions.headers)
+      
+      return secureOptions
+    }
+    
+    private selectUserAgent(): string {
+      // Weighted selection based on real browser usage
+      const weights = [40, 30, 20, 10] // Chrome, Firefox, Safari, Edge
+      const random = Math.random() * 100
+      let cumulative = 0
+      
+      for (let i = 0; i < this.config.userAgents.length; i++) {
+        cumulative += weights[i] || 10
+        if (random <= cumulative) {
+          return this.config.userAgents[i]
+        }
+      }
+      
+      return this.config.userAgents[0]
+    }
+    
+    private needsCorsProxy(url: string): boolean {
+      // Check if URL requires CORS proxy
+      const domain = new URL(url).hostname
+      
+      // Known domains that don't support CORS
+      const noCorsSupport = [
+        'example-feed.com',
+        'legacy-rss.org'
+      ]
+      
+      return noCorsSupport.some(d => domain.includes(d))
+    }
+    
+    private buildProxyUrl(targetUrl: string): string {
+      const encoded = encodeURIComponent(targetUrl)
+      return `${this.corsProxyUrl}?url=${encoded}`
+    }
+    
+    async storeCredentials(
+      feedId: string,
+      credentials: {
+        type: 'apiKey' | 'oauth' | 'basic'
+        data: any
+      }
+    ): Promise<void> {
+      // Encrypt credentials before storage
+      const encrypted = await this.encryptData(credentials)
+      
+      await this.storage.set(`feed-credentials:${feedId}`, {
+        encrypted,
+        timestamp: Date.now(),
+        type: credentials.type
+      })
+      
+      // Audit log
+      await this.auditLog.logSecurityEvent({
+        type: 'credentials_stored',
+        feedId,
+        timestamp: Date.now()
+      })
+    }
+    
+    private async encryptData(data: any): Promise<string> {
+      // Use Web Crypto API for encryption
+      const key = await this.getDerivedKey()
+      const iv = randomBytes(16)
+      
+      const encrypted = await crypto.subtle.encrypt(
+        {
+          name: 'AES-GCM',
+          iv
+        },
+        key,
+        new TextEncoder().encode(JSON.stringify(data))
+      )
+      
+      return btoa(
+        String.fromCharCode(...new Uint8Array(iv)) +
+        String.fromCharCode(...new Uint8Array(encrypted))
+      )
+    }
+    
+    private async validateResponse(
+      response: Response,
+      validateContent?: boolean
+    ): Promise<void> {
+      // Check response headers for security issues
+      const contentType = response.headers.get('content-type') || ''
+      
+      // Validate content type
+      const validTypes = [
+        'application/json',
+        'application/xml',
+        'text/xml',
+        'application/rss+xml',
+        'application/atom+xml',
+        'text/html'
+      ]
+      
+      if (!validTypes.some(type => contentType.includes(type))) {
+        throw new Error(`Unexpected content type: ${contentType}`)
+      }
+      
+      // Check for suspicious headers
+      const suspiciousHeaders = [
+        'x-xss-protection',
+        'x-content-type-options',
+        'x-frame-options'
+      ]
+      
+      for (const header of suspiciousHeaders) {
+        if (!response.headers.has(header)) {
+          console.warn(`Missing security header: ${header}`)
+        }
+      }
+      
+      // Validate content if requested
+      if (validateContent && response.ok) {
+        const text = await response.text()
+        await this.validateContentSafety(text, contentType)
+        
+        // Return new response with validated content
+        return new Response(text, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        })
+      }
+    }
+    
+    private async validateContentSafety(
+      content: string,
+      contentType: string
+    ): Promise<void> {
+      // Check for malicious patterns
+      const maliciousPatterns = [
+        /<script[\s\S]*?<\/script>/gi,
+        /javascript:/gi,
+        /on\w+\s*=/gi,
+        /<iframe/gi,
+        /<object/gi,
+        /<embed/gi,
+        /eval\s*\(/gi,
+        /expression\s*\(/gi
+      ]
+      
+      for (const pattern of maliciousPatterns) {
+        if (pattern.test(content)) {
+          throw new Error('Potentially malicious content detected')
+        }
+      }
+      
+      // Additional validation based on content type
+      if (contentType.includes('json')) {
+        try {
+          JSON.parse(content)
+        } catch {
+          throw new Error('Invalid JSON content')
+        }
+      }
+    }
+    
+    getSecurityMetrics(): SecurityMetrics {
+      const requests = Array.from(this.requestCounts.entries())
+      
+      return {
+        totalRequests: requests.reduce((sum, [_, t]) => sum + t.requests.length, 0),
+        blockedRequests: this.auditLog.getBlockedCount(),
+        rateLimitHits: this.auditLog.getRateLimitHits(),
+        maliciousContentDetected: this.auditLog.getMaliciousCount(),
+        averageRequestsPerDomain: this.calculateAverageRequests(requests),
+        securityScore: this.calculateSecurityScore()
+      }
+    }
+  }
+  
+  class AuditLogger {
+    private readonly MAX_LOGS = 10000
+    
+    constructor(private storage: Storage) {}
+    
+    async logRequest(entry: AuditEntry): Promise<void> {
+      const logs = await this.getLogs()
+      logs.push(entry)
+      
+      // Maintain size limit
+      if (logs.length > this.MAX_LOGS) {
+        logs.splice(0, logs.length - this.MAX_LOGS)
+      }
+      
+      await this.storage.set('security-audit-log', logs)
+    }
+    
+    async logSecurityEvent(event: SecurityEvent): Promise<void> {
+      const events = await this.getSecurityEvents()
+      events.push({
+        ...event,
+        id: this.generateEventId(),
+        timestamp: Date.now()
+      })
+      
+      await this.storage.set('security-events', events)
+    }
+    
+    private generateEventId(): string {
+      return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    }
+  }
+  ```
+
+#### Ticket 4.1.8: Performance Optimization with WebWorkers
+- **Description:** Implement WebWorkers for CPU-intensive feed processing to maintain UI responsiveness
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Create WebWorker pool for parallel feed processing
+  - Implement feed parsing in WebWorkers
+  - Add request batching and deduplication
+  - Create lazy loading for feed content
+  - Implement virtual scrolling for large feed lists
+  - Add preloading for anticipated user actions
+  - Optimize memory usage with weak references
+  - Implement progressive rendering strategies
+  - Add performance budgets and monitoring
+  - Create request prioritization based on viewport
+- **Dependencies:** 4.1.5
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/feeds/workers/FeedProcessor.worker.ts
+  import { expose } from 'comlink'
+  
+  interface ProcessorConfig {
+    maxBatchSize: number
+    processingTimeout: number
+    memoryLimit: number
+  }
+  
+  class FeedProcessor {
+    private config: ProcessorConfig
+    private abortController: AbortController | null = null
+    
+    constructor() {
+      this.config = {
+        maxBatchSize: 50,
+        processingTimeout: 5000,
+        memoryLimit: 50 * 1024 * 1024 // 50MB
+      }
+    }
+    
+    async processFeedBatch(
+      feeds: RawFeedData[],
+      options: ProcessingOptions
+    ): Promise<ProcessedFeedResult[]> {
+      this.abortController = new AbortController()
+      const signal = this.abortController.signal
+      
+      try {
+        // Process feeds in parallel with batching
+        const batches = this.createBatches(feeds, this.config.maxBatchSize)
+        const results: ProcessedFeedResult[] = []
+        
+        for (const batch of batches) {
+          if (signal.aborted) break
+          
+          const batchResults = await Promise.all(
+            batch.map(feed => this.processSingleFeed(feed, options))
+          )
+          
+          results.push(...batchResults)
+          
+          // Check memory usage
+          if (this.getMemoryUsage() > this.config.memoryLimit) {
+            await this.performMemoryCleanup()
+          }
+        }
+        
+        return results
+        
+      } finally {
+        this.abortController = null
+      }
+    }
+    
+    private async processSingleFeed(
+      feed: RawFeedData,
+      options: ProcessingOptions
+    ): Promise<ProcessedFeedResult> {
+      const startTime = performance.now()
+      
+      try {
+        // Parse feed based on type
+        const parsed = await this.parseFeed(feed)
+        
+        // Extract and optimize content
+        const optimized = await this.optimizeContent(parsed, options)
+        
+        // Generate metadata
+        const metadata = this.generateMetadata(optimized)
+        
+        return {
+          feedId: feed.id,
+          items: optimized,
+          metadata,
+          processingTime: performance.now() - startTime,
+          memoryUsed: this.estimateMemoryUsage(optimized)
+        }
+        
+      } catch (error) {
+        return {
+          feedId: feed.id,
+          error: error.message,
+          processingTime: performance.now() - startTime
+        }
+      }
+    }
+    
+    private async parseFeed(feed: RawFeedData): Promise<ParsedFeed> {
+      // Heavy parsing logic moved to worker
+      switch (feed.type) {
+        case 'rss':
+          return this.parseRSS(feed.content)
+        case 'atom':
+          return this.parseAtom(feed.content)
+        case 'json':
+          return this.parseJSON(feed.content)
+        default:
+          throw new Error(`Unsupported feed type: ${feed.type}`)
+      }
+    }
+    
+    private async optimizeContent(
+      parsed: ParsedFeed,
+      options: ProcessingOptions
+    ): Promise<OptimizedFeedItem[]> {
+      return parsed.items.map(item => ({
+        ...item,
+        // Extract text summary
+        summary: this.extractSummary(item.content, options.summaryLength),
+        
+        // Extract main image
+        thumbnail: this.extractThumbnail(item.content),
+        
+        // Clean and minify HTML
+        content: options.includeFullContent 
+          ? this.minifyHTML(item.content)
+          : undefined,
+        
+        // Calculate reading time
+        readingTime: this.calculateReadingTime(item.content),
+        
+        // Extract keywords
+        keywords: this.extractKeywords(item.content)
+      }))
+    }
+    
+    abort(): void {
+      if (this.abortController) {
+        this.abortController.abort()
+      }
+    }
+    
+    private createBatches<T>(items: T[], batchSize: number): T[][] {
+      const batches: T[][] = []
+      for (let i = 0; i < items.length; i += batchSize) {
+        batches.push(items.slice(i, i + batchSize))
+      }
+      return batches
+    }
+    
+    private getMemoryUsage(): number {
+      if ('memory' in performance) {
+        return (performance as any).memory.usedJSHeapSize
+      }
+      return 0
+    }
+    
+    private async performMemoryCleanup(): Promise<void> {
+      // Force garbage collection if available
+      if ('gc' in globalThis) {
+        (globalThis as any).gc()
+      }
+      
+      // Clear any caches
+      this.clearCaches()
+      
+      // Small delay to allow cleanup
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+  }
+  
+  // Expose worker API
+  expose(new FeedProcessor())
+  
+  // src/lib/feeds/WorkerPool.ts
+  import { wrap, releaseProxy } from 'comlink'
+  
+  interface PooledWorker {
+    worker: Worker
+    proxy: any
+    busy: boolean
+    lastUsed: number
+  }
+  
+  export class WorkerPool {
+    private workers: PooledWorker[] = []
+    private queue: Array<{
+      task: any
+      resolve: Function
+      reject: Function
+    }> = []
+    
+    constructor(
+      private workerPath: string,
+      private minWorkers = 2,
+      private maxWorkers = navigator.hardwareConcurrency || 4
+    ) {
+      this.initializePool()
+    }
+    
+    private initializePool(): void {
+      // Create minimum number of workers
+      for (let i = 0; i < this.minWorkers; i++) {
+        this.createWorker()
+      }
+      
+      // Monitor and scale based on queue size
+      setInterval(() => this.scalePool(), 1000)
+    }
+    
+    private createWorker(): PooledWorker {
+      const worker = new Worker(this.workerPath, { type: 'module' })
+      const proxy = wrap(worker)
+      
+      const pooledWorker: PooledWorker = {
+        worker,
+        proxy,
+        busy: false,
+        lastUsed: Date.now()
+      }
+      
+      this.workers.push(pooledWorker)
+      return pooledWorker
+    }
+    
+    async execute<T>(
+      method: string,
+      ...args: any[]
+    ): Promise<T> {
+      return new Promise((resolve, reject) => {
+        const task = { method, args, resolve, reject }
+        this.queue.push(task)
+        this.processQueue()
+      })
+    }
+    
+    private async processQueue(): Promise<void> {
+      if (this.queue.length === 0) return
+      
+      // Find available worker
+      let worker = this.workers.find(w => !w.busy)
+      
+      // Create new worker if needed and under limit
+      if (!worker && this.workers.length < this.maxWorkers) {
+        worker = this.createWorker()
+      }
+      
+      if (!worker) return // All workers busy
+      
+      // Get next task
+      const task = this.queue.shift()
+      if (!task) return
+      
+      // Mark worker as busy
+      worker.busy = true
+      worker.lastUsed = Date.now()
+      
+      try {
+        // Execute task
+        const result = await worker.proxy[task.method](...task.args)
+        task.resolve(result)
+      } catch (error) {
+        task.reject(error)
+      } finally {
+        worker.busy = false
+        
+        // Process next task
+        this.processQueue()
+      }
+    }
+    
+    private scalePool(): void {
+      const now = Date.now()
+      const idleTimeout = 30000 // 30 seconds
+      
+      // Scale up if queue is growing
+      if (this.queue.length > 5 && this.workers.length < this.maxWorkers) {
+        this.createWorker()
+      }
+      
+      // Scale down idle workers
+      const idleWorkers = this.workers.filter(
+        w => !w.busy && now - w.lastUsed > idleTimeout
+      )
+      
+      if (idleWorkers.length > this.minWorkers) {
+        const toRemove = idleWorkers[0]
+        const index = this.workers.indexOf(toRemove)
+        
+        if (index > -1) {
+          this.workers.splice(index, 1)
+          releaseProxy(toRemove.proxy)
+          toRemove.worker.terminate()
+        }
+      }
+    }
+    
+    async terminate(): Promise<void> {
+      // Clear queue
+      this.queue.forEach(task => {
+        task.reject(new Error('Worker pool terminated'))
+      })
+      this.queue = []
+      
+      // Terminate all workers
+      await Promise.all(
+        this.workers.map(async w => {
+          releaseProxy(w.proxy)
+          w.worker.terminate()
+        })
+      )
+      
+      this.workers = []
+    }
+  }
+  
+  // src/lib/feeds/PerformanceOptimizer.ts
+  export class PerformanceOptimizer {
+    private workerPool: WorkerPool
+    private renderQueue = new RenderQueue()
+    private intersectionObserver: IntersectionObserver
+    private weakCache = new WeakMap<object, any>()
+    
+    constructor() {
+      this.workerPool = new WorkerPool('/workers/FeedProcessor.worker.js')
+      this.initializeObservers()
+    }
+    
+    private initializeObservers(): void {
+      // Intersection observer for lazy loading
+      this.intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              this.loadFeedItem(entry.target)
+            }
+          })
+        },
+        {
+          rootMargin: '100px' // Preload 100px before visible
+        }
+      )
+    }
+    
+    async processFeedsWithWorkers(
+      feeds: RawFeedData[]
+    ): Promise<ProcessedFeedResult[]> {
+      // Deduplicate requests
+      const uniqueFeeds = this.deduplicateFeeds(feeds)
+      
+      // Process in worker pool
+      const results = await this.workerPool.execute(
+        'processFeedBatch',
+        uniqueFeeds,
+        {
+          summaryLength: 200,
+          includeFullContent: false
+        }
+      )
+      
+      // Cache results with weak references
+      results.forEach(result => {
+        this.weakCache.set({ feedId: result.feedId }, result)
+      })
+      
+      return results
+    }
+    
+    private deduplicateFeeds(feeds: RawFeedData[]): RawFeedData[] {
+      const seen = new Set<string>()
+      return feeds.filter(feed => {
+        const key = `${feed.id}:${feed.lastModified}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    }
+    
+    observeFeedItem(element: HTMLElement): void {
+      this.intersectionObserver.observe(element)
+    }
+    
+    private async loadFeedItem(element: Element): Promise<void> {
+      const feedId = element.getAttribute('data-feed-id')
+      const itemId = element.getAttribute('data-item-id')
+      
+      if (!feedId || !itemId) return
+      
+      // Check if already loaded
+      if (element.hasAttribute('data-loaded')) return
+      
+      // Load content
+      const content = await this.fetchItemContent(feedId, itemId)
+      
+      // Render with progressive enhancement
+      this.renderQueue.enqueue(() => {
+        this.renderContent(element, content)
+        element.setAttribute('data-loaded', 'true')
+      })
+    }
+    
+    setupVirtualScrolling(
+      container: HTMLElement,
+      items: FeedItem[],
+      itemHeight = 100
+    ): VirtualScroller {
+      return new VirtualScroller({
+        container,
+        items,
+        itemHeight,
+        renderItem: (item, element) => {
+          element.setAttribute('data-feed-id', item.feedId)
+          element.setAttribute('data-item-id', item.id)
+          this.observeFeedItem(element)
+        },
+        buffer: 5 // Render 5 items outside viewport
+      })
+    }
+    
+    async preloadUserActions(
+      currentFeed: string,
+      userHistory: UserAction[]
+    ): Promise<void> {
+      // Analyze user patterns
+      const predictions = this.predictNextActions(userHistory)
+      
+      // Preload likely feeds
+      for (const prediction of predictions) {
+        if (prediction.probability > 0.7) {
+          this.preloadFeed(prediction.feedId)
+        }
+      }
+    }
+    
+    private async preloadFeed(feedId: string): Promise<void> {
+      // Check if already cached
+      if (this.weakCache.has({ feedId })) return
+      
+      // Fetch in background with low priority
+      requestIdleCallback(async () => {
+        const feed = await this.fetchFeedData(feedId)
+        const processed = await this.workerPool.execute(
+          'processSingleFeed',
+          feed,
+          { summaryLength: 200 }
+        )
+        
+        this.weakCache.set({ feedId }, processed)
+      })
+    }
+    
+    getPerformanceMetrics(): PerformanceMetrics {
+      return {
+        workerPoolSize: this.workerPool.size,
+        renderQueueLength: this.renderQueue.length,
+        cacheHitRate: this.calculateCacheHitRate(),
+        avgProcessingTime: this.calculateAvgProcessingTime(),
+        memoryUsage: performance.memory?.usedJSHeapSize || 0,
+        recommendations: this.generateOptimizationRecommendations()
+      }
+    }
+  }
+  
+  class RenderQueue {
+    private queue: Function[] = []
+    private isProcessing = false
+    
+    enqueue(task: Function): void {
+      this.queue.push(task)
+      if (!this.isProcessing) {
+        this.process()
+      }
+    }
+    
+    private process(): void {
+      if (this.queue.length === 0) {
+        this.isProcessing = false
+        return
+      }
+      
+      this.isProcessing = true
+      
+      requestAnimationFrame(() => {
+        const startTime = performance.now()
+        const timeLimit = 16 // One frame (60fps)
+        
+        while (this.queue.length > 0 && 
+               performance.now() - startTime < timeLimit) {
+          const task = this.queue.shift()!
+          task()
+        }
+        
+        this.process()
+      })
+    }
+    
+    get length(): number {
+      return this.queue.length
+    }
+  }
+  ```
+
+### Story 4.1 Summary
+**Total Story Points:** 16 SP (increased from 7 SP)  
+**Total Tickets:** 8 (increased from 4)  
+**Key Enhancements:**
+- Advanced caching with compression and ETags
+- Comprehensive monitoring with quality metrics
+- Central FeedManager orchestration
+- Network resilience and offline support
+- Security layer with CORS proxy
+- Performance optimization with WebWorkers
+
 ---
 
 ## Story 4.2: Product Hunt Feed
-**Description:** Implement Product Hunt integration to display latest product launches and trending products in a beautiful, minimal widget.
+**Description:** Implement a comprehensive Product Hunt integration with real-time updates, advanced filtering, offline support, and analytics to help PMs track product launches and market trends effectively.
 
 **Acceptance Criteria:**
-- Fetch latest products from Product Hunt API
-- Display product cards with key information
-- Support filtering by category and time
-- Cache product images efficiently
-- Show upvote counts and hunter info
+- Fetch products from Product Hunt GraphQL API with multiple collection support
+- Display responsive product cards with interactive features
+- Support advanced filtering by category, date, product type, and custom searches
+- Implement real-time updates via webhooks for new product launches
+- Enable offline functionality with background sync
+- Add interactive upvoting and bookmarking capabilities
+- Include analytics tracking for user engagement insights
+- Ensure accessibility compliance (WCAG 2.1 AA)
+- Achieve performance target of < 200ms initial load time
+- Support pagination and infinite scroll for large datasets
+
+**Story Points:** 14 SP (was 6 SP)
+**Total Tickets:** 8 (was 5)
 
 ### Tickets:
 
 #### Ticket 4.2.1: Create ProductHuntFeed Widget Component
-- **Description:** Build the main Product Hunt feed widget with modern, minimal design
-- **Story Points:** 1 SP
+- **Description:** Build the main Product Hunt feed widget with modern design, real-time updates, and accessibility features
+- **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Create responsive grid layout for product cards
-  - Implement skeleton loading states
-  - Add empty state for no products
-  - Support compact and expanded view modes
-  - Follow modern design with subtle shadows and clean typography
-- **Dependencies:** Epic 2 completion
+  - Create responsive grid layout with CSS Grid for product cards
+  - Implement skeleton loading states with shimmer effect
+  - Add empty state with actionable suggestions
+  - Support compact, expanded, and list view modes
+  - Implement error boundary specific to Product Hunt widget
+  - Add pagination with infinite scroll support
+  - Enable real-time updates via WebSocket connection
+  - Implement keyboard navigation (arrow keys, tab) for accessibility
+  - Add widget performance monitoring with Web Vitals
+  - Support widget resizing and drag-to-reorder
+  - Include pull-to-refresh functionality
+  - Add view mode persistence in user preferences
+- **Dependencies:** Epic 2 completion, 4.1.5
 - **Implementation Notes:**
   ```typescript
   // src/components/widgets/ProductHuntFeed.tsx
@@ -459,15 +2742,29 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
   ```
 
 #### Ticket 4.2.2: Implement Product Hunt API Integration
-- **Description:** Create background script handler for fetching Product Hunt data via their GraphQL API
-- **Story Points:** 2 SP
+- **Description:** Create robust background script handler for Product Hunt GraphQL API with real-time updates and advanced querying
+- **Story Points:** 3 SP
 - **Technical Requirements:**
-  - Implement OAuth2 authentication flow
-  - Query posts with required fields
-  - Handle pagination for more products
-  - Transform API response to our data model
-  - Respect API rate limits
-- **Dependencies:** 4.1.1
+  - Implement OAuth2 authentication flow with token refresh
+  - Support multiple API keys for load balancing
+  - Query posts with all available fields including media galleries
+  - Handle cursor-based pagination for large datasets
+  - Transform API response to unified data model
+  - Respect API rate limits with exponential backoff
+  - Implement GraphQL-specific error handling and retry logic
+  - Add webhook support for real-time product launches
+  - Cache GraphQL queries at the query level
+  - Support fetching multiple collections:
+    - Today's Products
+    - This Week's Products
+    - This Month's Products
+    - Trending Products
+    - Product Collections by Topic
+  - Handle API deprecation notices gracefully
+  - Implement request batching for efficiency
+  - Add support for Product Hunt Ship (upcoming products)
+  - Include API health monitoring and alerting
+- **Dependencies:** 4.1.1, 4.1.3, 4.1.6
 - **Implementation Notes:**
   ```typescript
   // src/background/messages/fetch-product-hunt.ts
@@ -602,15 +2899,28 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
   ```
 
 #### Ticket 4.2.3: Add Feed Parsing and Data Transformation
-- **Description:** Create utilities to parse and normalize Product Hunt data
-- **Story Points:** 1 SP
+- **Description:** Create comprehensive utilities to parse, validate, and normalize Product Hunt data with type safety
+- **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Validate API response structure
-  - Handle missing or null fields gracefully
-  - Format dates and numbers consistently
-  - Extract and normalize topic tags
-  - Sanitize HTML in descriptions
-- **Dependencies:** 4.2.2
+  - Implement Zod schemas for type-safe API response validation
+  - Handle missing or null fields with sensible defaults
+  - Format dates with timezone awareness and relative time
+  - Extract and normalize topic tags with category mapping
+  - Sanitize HTML/Markdown in descriptions with DOMPurify
+  - Parse special Product Hunt entities:
+    - "Coming Soon" products with launch dates
+    - Golden Kitty Award winners and nominees
+    - Product badges (Product of the Day/Week/Month)
+    - Maker achievements and badges
+  - Extract full media galleries, not just thumbnails
+  - Parse pricing information and business models
+  - Distinguish between launch date and featured date
+  - Handle product variants (iOS, Android, Web, etc.)
+  - Extract social links and company information
+  - Parse user roles (hunter vs maker vs contributor)
+  - Normalize vote counts with abbreviations (1.2k, 10k+)
+  - Implement data quality scoring for products
+- **Dependencies:** 4.2.2, 4.1.7
 - **Implementation Notes:**
   ```typescript
   // src/lib/feeds/parsers/productHuntParser.ts
@@ -676,16 +2986,28 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
   ```
 
 #### Ticket 4.2.4: Create Product Card UI Components
-- **Description:** Build beautiful, minimal product card components with hover effects
-- **Story Points:** 1 SP
+- **Description:** Build interactive product card components with rich features and smooth animations
+- **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Design clean card with product info
-  - Add subtle hover animations
-  - Display vote count with upvote button
-  - Show maker avatars in stack
-  - Optimize image loading with lazy load
-  - Support dark mode
-- **Dependencies:** 4.2.1
+  - Design responsive cards with multiple layout modes
+  - Add smooth hover animations and micro-interactions
+  - Implement interactive upvote with optimistic updates
+  - Display real-time vote count changes with animations
+  - Show maker avatars in overlapping stack with tooltips
+  - Create quick preview modal/popover for product details
+  - Add social sharing buttons (Twitter, LinkedIn, etc.)
+  - Implement save/bookmark functionality with sync
+  - Progressive image loading with blur-up effect
+  - Support responsive images based on device pixel ratio
+  - Full dark mode support with theme transitions
+  - Add product badges and awards display
+  - Show "New" indicator for recently launched products
+  - Display comment count with preview on hover
+  - Implement swipe gestures for mobile devices
+  - Add loading skeleton specific to card layout
+  - Include accessibility labels and ARIA attributes
+  - Support keyboard interactions (Enter to open, Space to upvote)
+- **Dependencies:** 4.2.1, 4.2.3
 - **Implementation Notes:**
   ```typescript
   // src/components/widgets/productHunt/ProductCard.tsx
@@ -812,81 +3134,526 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
   }
   ```
 
-#### Ticket 4.2.5: Add Filtering and Sorting Options
-- **Description:** Implement filter bar for categories and sorting options
-- **Story Points:** 1 SP
+#### Ticket 4.2.5: Add Advanced Filtering and Sorting
+- **Description:** Implement comprehensive filter bar with multiple criteria and intelligent sorting options
+- **Story Points:** 2 SP
 - **Technical Requirements:**
-  - Filter by product categories/topics
-  - Sort by votes, date, or comments
-  - Show active filter count
-  - Clear all filters option
-  - Persist filter preferences
+  - Filter by multiple criteria simultaneously:
+    - Product categories/topics (with multi-select)
+    - Date ranges (today, this week, this month, custom)
+    - Product types (Mobile App, Web App, Hardware, Books, Podcasts, Newsletter)
+    - Platform (iOS, Android, Web, Mac, Windows, Chrome Extension)
+    - Price (Free, Freemium, Paid, Enterprise)
+    - Maker status (Verified, Top Hunter, First-time Maker)
+  - Advanced sorting options:
+    - Most Upvoted (with time decay algorithm)
+    - Newest First
+    - Trending (velocity-based algorithm)
+    - Most Discussed (by comment count)
+    - Maker Reputation Score
+    - Relevance (based on user preferences)
+  - Search within products with fuzzy matching
+  - Show active filter count with badges
+  - One-click clear all filters
+  - Save filter presets (e.g., "AI Products", "Developer Tools")
+  - Filter suggestions based on current view
+  - Persist filter preferences per user
+  - Export filtered results to CSV/JSON
+  - Smart filters based on user interaction history
+  - Real-time filter updates without page reload
 - **Dependencies:** 4.2.4
 - **Implementation Notes:**
   ```typescript
   // src/components/widgets/productHunt/FilterBar.tsx
-  interface FilterBarProps {
-    activeFilter: string
-    onFilterChange: (filter: string) => void
+  import { useState, useMemo } from 'react'
+  import { useStorage } from '@plasmohq/storage/hook'
+  import { Calendar, Search, Filter, Download } from 'lucide-react'
+  
+  interface FilterState {
     categories: string[]
+    dateRange: 'today' | 'week' | 'month' | 'all' | 'custom'
+    productTypes: ProductType[]
+    platforms: Platform[]
+    priceModel: PriceModel[]
+    sortBy: SortOption
+    searchQuery: string
+  }
+  
+  interface FilterBarProps {
+    filters: FilterState
+    onFiltersChange: (filters: FilterState) => void
+    availableCategories: string[]
+    onExport: (format: 'csv' | 'json') => void
   }
   
   export function FilterBar({ 
-    activeFilter, 
-    onFilterChange, 
-    categories 
+    filters, 
+    onFiltersChange,
+    availableCategories,
+    onExport
   }: FilterBarProps) {
-    const [showAll, setShowAll] = useState(false)
-    const displayCategories = showAll ? categories : categories.slice(0, 5)
+    const [showAdvanced, setShowAdvanced] = useState(false)
+    const [savedPresets] = useStorage<FilterPreset[]>('ph-filter-presets', [])
+    const [searchQuery, setSearchQuery] = useState(filters.searchQuery)
+    
+    const activeFilterCount = useMemo(() => {
+      let count = 0
+      if (filters.categories.length > 0) count += filters.categories.length
+      if (filters.dateRange !== 'all') count++
+      if (filters.productTypes.length > 0) count += filters.productTypes.length
+      if (filters.platforms.length > 0) count += filters.platforms.length
+      if (filters.priceModel.length > 0) count += filters.priceModel.length
+      if (filters.searchQuery) count++
+      return count
+    }, [filters])
+    
+    const handleSearchSubmit = (e: React.FormEvent) => {
+      e.preventDefault()
+      onFiltersChange({ ...filters, searchQuery })
+    }
+    
+    const clearAllFilters = () => {
+      onFiltersChange({
+        categories: [],
+        dateRange: 'all',
+        productTypes: [],
+        platforms: [],
+        priceModel: [],
+        sortBy: 'trending',
+        searchQuery: ''
+      })
+      setSearchQuery('')
+    }
     
     return (
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        <FilterChip
-          label="All"
-          active={activeFilter === 'all'}
-          onClick={() => onFilterChange('all')}
-        />
-        
-        {displayCategories.map(category => (
-          <FilterChip
-            key={category}
-            label={category}
-            active={activeFilter === category}
-            onClick={() => onFilterChange(category)}
-          />
-        ))}
-        
-        {categories.length > 5 && (
+      <div className="space-y-3">
+        {/* Search and Quick Actions */}
+        <div className="flex gap-2">
+          <form onSubmit={handleSearchSubmit} className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search products..."
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+              />
+            </div>
+          </form>
+          
           <button
-            onClick={() => setShowAll(!showAll)}
-            className="text-sm text-blue-600 hover:text-blue-700 whitespace-nowrap"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className={cn(
+              "px-4 py-2 rounded-lg border transition-colors",
+              showAdvanced 
+                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
+                : "border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            )}
           >
-            {showAll ? 'Show less' : `+${categories.length - 5} more`}
+            <Filter className="w-4 h-4" />
           </button>
+          
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearAllFilters}
+              className="px-3 py-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400"
+            >
+              Clear all ({activeFilterCount})
+            </button>
+          )}
+        </div>
+        
+        {/* Sort Options */}
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
+          <div className="flex gap-2">
+            {sortOptions.map(option => (
+              <button
+                key={option.value}
+                onClick={() => onFiltersChange({ ...filters, sortBy: option.value })}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm transition-colors",
+                  filters.sortBy === option.value
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Advanced Filters */}
+        {showAdvanced && (
+          <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4">
+            {/* Date Range */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Date Range
+              </label>
+              <DateRangePicker 
+                value={filters.dateRange}
+                onChange={(dateRange) => onFiltersChange({ ...filters, dateRange })}
+              />
+            </div>
+            
+            {/* Categories */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Categories
+              </label>
+              <MultiSelect
+                options={availableCategories}
+                selected={filters.categories}
+                onChange={(categories) => onFiltersChange({ ...filters, categories })}
+              />
+            </div>
+            
+            {/* Product Types */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Product Types
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {productTypes.map(type => (
+                  <FilterChip
+                    key={type.value}
+                    label={type.label}
+                    active={filters.productTypes.includes(type.value)}
+                    onClick={() => {
+                      const productTypes = filters.productTypes.includes(type.value)
+                        ? filters.productTypes.filter(t => t !== type.value)
+                        : [...filters.productTypes, type.value]
+                      onFiltersChange({ ...filters, productTypes })
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Filter Presets */}
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                {savedPresets.map(preset => (
+                  <button
+                    key={preset.id}
+                    onClick={() => onFiltersChange(preset.filters)}
+                    className="px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 text-sm"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onExport('csv')}
+                  className="text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400"
+                >
+                  <Download className="w-4 h-4 inline mr-1" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={() => onExport('json')}
+                  className="text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400"
+                >
+                  <Download className="w-4 h-4 inline mr-1" />
+                  Export JSON
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     )
   }
   
-  function FilterChip({ label, active, onClick }: {
-    label: string
-    active: boolean
-    onClick: () => void
-  }) {
-    return (
-      <button
-        onClick={onClick}
-        className={cn(
-          "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-          "border border-gray-300 dark:border-gray-600",
-          active
-            ? "bg-blue-600 text-white border-blue-600"
-            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-        )}
-      >
-        {label}
-      </button>
-    )
+  const sortOptions = [
+    { value: 'trending', label: 'Trending' },
+    { value: 'votes', label: 'Most Upvoted' },
+    { value: 'newest', label: 'Newest' },
+    { value: 'discussed', label: 'Most Discussed' },
+    { value: 'relevance', label: 'Relevant to You' }
+  ]
+  
+  const productTypes = [
+    { value: 'mobile', label: 'Mobile App' },
+    { value: 'web', label: 'Web App' },
+    { value: 'hardware', label: 'Hardware' },
+    { value: 'books', label: 'Books' },
+    { value: 'podcasts', label: 'Podcasts' },
+    { value: 'newsletter', label: 'Newsletter' }
+  ]
+  ```
+
+#### Ticket 4.2.6: Analytics & Tracking
+- **Description:** Implement comprehensive analytics to track user engagement with Product Hunt feed
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Track user interactions:
+    - Product clicks (with destination tracking)
+    - Upvote actions (successful vs failed)
+    - Bookmark/save actions
+    - Time spent viewing products
+    - Scroll depth and engagement patterns
+  - Measure engagement metrics:
+    - Click-through rate by product category
+    - Most viewed product types
+    - Peak usage times
+    - User preference learning
+  - Generate insights:
+    - Trending categories based on user behavior
+    - Personalized product recommendations
+    - Engagement heatmaps
+  - Privacy-preserving implementation:
+    - Local analytics processing
+    - No PII in analytics data
+    - User consent for tracking
+    - Export anonymized data only
+  - Integration with dashboard analytics:
+    - Unified analytics dashboard
+    - Cross-widget insights
+    - Export reports for PM teams
+- **Dependencies:** 4.2.1, 4.2.5, 4.1.4
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/analytics/productHuntAnalytics.ts
+  import { Analytics } from '~/lib/analytics/core'
+  
+  export class ProductHuntAnalytics extends Analytics {
+    async trackProductView(product: ProductHuntItem, context: ViewContext) {
+      const event = {
+        type: 'product_view',
+        productId: product.id,
+        category: product.topics[0],
+        position: context.position,
+        viewMode: context.viewMode,
+        timestamp: Date.now(),
+        sessionId: this.getSessionId()
+      }
+      
+      await this.recordEvent(event)
+      await this.updateUserPreferences(product.topics)
+    }
+    
+    async trackInteraction(
+      type: 'click' | 'upvote' | 'bookmark' | 'share',
+      product: ProductHuntItem,
+      success: boolean
+    ) {
+      const event = {
+        type: `product_${type}`,
+        productId: product.id,
+        success,
+        voteCount: product.votes,
+        userEngagementScore: this.calculateEngagementScore(product),
+        timestamp: Date.now()
+      }
+      
+      await this.recordEvent(event)
+      
+      if (type === 'click') {
+        await this.trackClickDestination(product.url)
+      }
+    }
+    
+    async generateInsights(): Promise<ProductHuntInsights> {
+      const events = await this.getEvents('7d')
+      
+      return {
+        topCategories: this.analyzeTopCategories(events),
+        engagementTrends: this.analyzeEngagementTrends(events),
+        userPreferences: this.analyzeUserPreferences(events),
+        recommendations: await this.generateRecommendations(events),
+        peakUsageTimes: this.analyzePeakTimes(events)
+      }
+    }
+  }
+  ```
+
+#### Ticket 4.2.7: Advanced Features
+- **Description:** Implement advanced features for power users including maker following, integrations, and competitive analysis
+- **Story Points:** 3 SP
+- **Technical Requirements:**
+  - Maker following system:
+    - Follow/unfollow makers
+    - Notifications for new launches by followed makers
+    - Maker leaderboard and statistics
+    - Track maker launch history
+  - External integrations:
+    - Export to Notion database
+    - Save to Airtable base
+    - Send to Slack channels
+    - Create Jira tickets for interesting products
+    - Add to Google Sheets tracker
+  - Competitive analysis features:
+    - Compare similar products side-by-side
+    - Track competitor product launches
+    - Market positioning analysis
+    - Feature comparison matrices
+  - Product Hunt Ship integration:
+    - Show upcoming products
+    - Subscribe to launch notifications
+    - Early access signup tracking
+  - Collections and lists:
+    - Create custom product collections
+    - Share collections with team
+    - Collaborative voting on products
+  - Golden Kitty Awards:
+    - Highlight award winners
+    - Filter by award categories
+    - Historical award data
+- **Dependencies:** 4.2.1, 4.2.5, 4.2.6
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/features/productHuntAdvanced.ts
+  interface AdvancedFeatures {
+    makerFollowing: MakerFollowingService
+    integrations: IntegrationManager
+    competitiveAnalysis: CompetitiveAnalyzer
+    collections: CollectionManager
+    awards: AwardsTracker
+  }
+  
+  export class ProductHuntAdvanced {
+    async followMaker(makerId: string) {
+      await this.storage.add('followed-makers', makerId)
+      await this.notifications.subscribe(`maker-${makerId}-launches`)
+      await this.analytics.track('maker_followed', { makerId })
+    }
+    
+    async exportToNotion(products: ProductHuntItem[], config: NotionConfig) {
+      const notion = new NotionClient(config.apiKey)
+      const database = await notion.getDatabase(config.databaseId)
+      
+      for (const product of products) {
+        await notion.createPage({
+          parent: { database_id: config.databaseId },
+          properties: this.mapProductToNotionProperties(product)
+        })
+      }
+    }
+    
+    async compareProducts(productIds: string[]): Promise<ComparisonMatrix> {
+      const products = await this.fetchProductDetails(productIds)
+      
+      return {
+        features: this.extractFeatures(products),
+        metrics: this.compareMetrics(products),
+        positioning: this.analyzePositioning(products),
+        insights: this.generateComparisonInsights(products)
+      }
+    }
+  }
+  ```
+
+#### Ticket 4.2.8: Offline Support
+- **Description:** Implement comprehensive offline functionality with background sync and progressive enhancement
+- **Story Points:** 2 SP
+- **Technical Requirements:**
+  - Offline data caching:
+    - Cache product data in IndexedDB
+    - Store images with service worker
+    - Implement cache versioning
+    - Smart cache eviction policies
+  - Background sync:
+    - Queue user actions when offline
+    - Sync upvotes/bookmarks when online
+    - Handle conflict resolution
+    - Retry failed syncs automatically
+  - Offline indicators:
+    - Show offline status badge
+    - Indicate cached vs fresh data
+    - Display last sync timestamp
+    - Warn before actions that require internet
+  - Progressive enhancement:
+    - Basic features work offline
+    - Enhanced features when online
+    - Graceful degradation
+  - Data persistence:
+    - Save user preferences offline
+    - Persist filter states
+    - Cache analytics data
+    - Export data while offline
+  - Sync strategies:
+    - Periodic background sync
+    - Sync on network recovery
+    - Manual sync trigger
+    - Selective sync for data types
+- **Dependencies:** 4.1.6, 4.2.1
+- **Implementation Notes:**
+  ```typescript
+  // src/lib/offline/productHuntOffline.ts
+  import { openDB } from 'idb'
+  
+  export class ProductHuntOfflineManager {
+    private db: IDBDatabase
+    private syncQueue: SyncQueue
+    
+    async initialize() {
+      this.db = await openDB('product-hunt-offline', 1, {
+        upgrade(db) {
+          db.createObjectStore('products', { keyPath: 'id' })
+          db.createObjectStore('actions', { keyPath: 'id', autoIncrement: true })
+          db.createObjectStore('images', { keyPath: 'url' })
+        }
+      })
+      
+      await this.registerBackgroundSync()
+    }
+    
+    async cacheProducts(products: ProductHuntItem[]) {
+      const tx = this.db.transaction('products', 'readwrite')
+      
+      for (const product of products) {
+        await tx.store.put({
+          ...product,
+          cachedAt: Date.now(),
+          isOffline: true
+        })
+        
+        // Cache images
+        if (product.thumbnail) {
+          await this.cacheImage(product.thumbnail)
+        }
+      }
+      
+      await tx.done
+    }
+    
+    async queueAction(action: UserAction) {
+      if (!navigator.onLine) {
+        await this.syncQueue.add(action)
+        
+        // Optimistic update
+        if (action.type === 'upvote') {
+          await this.updateLocalVoteCount(action.productId, 1)
+        }
+        
+        return { queued: true, id: action.id }
+      }
+      
+      return this.executeAction(action)
+    }
+    
+    async sync() {
+      const actions = await this.syncQueue.getAll()
+      const results = []
+      
+      for (const action of actions) {
+        try {
+          const result = await this.executeAction(action)
+          await this.syncQueue.remove(action.id)
+          results.push({ action, success: true, result })
+        } catch (error) {
+          results.push({ action, success: false, error })
+        }
+      }
+      
+      return results
+    }
   }
   ```
 
@@ -2357,7 +5124,10 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
 ## Epic Summary
 
 ### Deliverables:
-- ✅ Robust feed infrastructure with caching and error handling
+- ✅ Enterprise-grade feed infrastructure with advanced caching, monitoring, and security
+- ✅ Central FeedManager with intelligent orchestration and deduplication
+- ✅ Network resilience with offline support and circuit breakers
+- ✅ WebWorker-based performance optimization for UI responsiveness
 - ✅ Product Hunt integration with beautiful product cards
 - ✅ Hacker News feed with story ranking and metrics
 - ✅ Jira integration with OAuth and ticket management
@@ -2365,10 +5135,11 @@ Implement real-time data feeds from various sources to provide PMs with up-to-da
 - ✅ Modern, minimal UI design throughout
 
 ### Key Milestones:
-1. **Feed Infrastructure Complete** - Background fetching and caching working
-2. **All Feeds Integrated** - Product Hunt, HN, Jira, RSS functional
-3. **UI Polish Complete** - All widgets following modern design principles
-4. **Performance Optimized** - Efficient caching and data management
+1. **Enhanced Feed Infrastructure** - Production-ready with compression, ETags, and monitoring
+2. **Security & Resilience Layer** - CORS proxy, rate limiting, and offline support
+3. **Performance Optimization** - WebWorkers, lazy loading, and virtual scrolling
+4. **All Feeds Integrated** - Product Hunt, HN, Jira, RSS functional
+5. **UI Polish Complete** - All widgets following modern design principles
 
 ### Next Steps:
 - Proceed to Epic 5: Web Clipper - Build content capture functionality
