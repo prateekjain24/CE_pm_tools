@@ -60,6 +60,14 @@
   }
 
   /* Widget Base Styles */
+  .widget-base {
+    @apply bg-white dark:bg-gray-800 rounded-lg overflow-hidden h-full;
+  }
+  
+  .widget-content {
+    @apply h-full overflow-auto;
+  }
+  
   .widget-container {
     @apply relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 transition-all duration-200 overflow-hidden;
   }

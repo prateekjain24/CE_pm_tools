@@ -4,6 +4,9 @@ import { WidgetRenderer } from "./WidgetRenderer"
 
 interface WidgetContainerProps {
   widget: WidgetConfig
+  activeCalculator?: string | null
+  viewMode?: "compact" | "full"
+  onExpand?: () => void
   onRemove: () => void
   onResize: (newSize: Size) => void
   onSettings: () => void
@@ -11,7 +14,10 @@ interface WidgetContainerProps {
 }
 
 export const WidgetContainer = forwardRef<HTMLDivElement, WidgetContainerProps>(
-  ({ widget, onRemove, onSettings, onHide }, ref) => {
+  (
+    { widget, activeCalculator, viewMode = "compact", onExpand, onRemove, onSettings, onHide },
+    ref
+  ) => {
     const gridStyles = {
       gridColumn: `span ${widget.size.width}`,
       gridRow: `span ${widget.size.height}`,
@@ -26,6 +32,9 @@ export const WidgetContainer = forwardRef<HTMLDivElement, WidgetContainerProps>(
       >
         <WidgetRenderer
           widget={widget}
+          activeCalculator={activeCalculator}
+          viewMode={viewMode}
+          onExpand={onExpand}
           onRemove={onRemove}
           onSettings={onSettings}
           onHide={onHide}

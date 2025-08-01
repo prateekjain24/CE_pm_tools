@@ -13,6 +13,7 @@ export function getDefaultLayout(): WidgetConfig[] {
       size: DEFAULT_WIDGET_SIZES["rice-calculator"],
       visible: true,
       title: "RICE Calculator",
+      viewMode: "compact",
     },
     {
       id: "widget-product-hunt-1",
@@ -21,6 +22,7 @@ export function getDefaultLayout(): WidgetConfig[] {
       size: DEFAULT_WIDGET_SIZES["product-hunt-feed"],
       visible: true,
       title: "Product Hunt",
+      viewMode: "compact",
     },
     {
       id: "widget-hacker-news-1",
@@ -29,6 +31,7 @@ export function getDefaultLayout(): WidgetConfig[] {
       size: DEFAULT_WIDGET_SIZES["hacker-news-feed"],
       visible: true,
       title: "Hacker News",
+      viewMode: "compact",
     },
     {
       id: "widget-tam-1",
@@ -37,6 +40,7 @@ export function getDefaultLayout(): WidgetConfig[] {
       size: DEFAULT_WIDGET_SIZES["tam-calculator"],
       visible: true,
       title: "TAM/SAM/SOM Calculator",
+      viewMode: "compact",
     },
     {
       id: "widget-roi-1",
@@ -45,6 +49,7 @@ export function getDefaultLayout(): WidgetConfig[] {
       size: DEFAULT_WIDGET_SIZES["roi-calculator"],
       visible: true,
       title: "ROI Calculator",
+      viewMode: "compact",
     },
   ]
 

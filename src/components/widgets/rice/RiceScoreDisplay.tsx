@@ -1,4 +1,3 @@
-import { motion } from "framer-motion"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { createSafeAnimationProps, SafeMotionDiv } from "~/lib/animation/safeMotion"
 import { getRiceScoreCategory } from "~/lib/calculators/rice"
@@ -22,7 +21,11 @@ const categoryColors = {
   red: { primary: "#ef4444", secondary: "#fee2e2" },
 }
 
-export function RiceScoreDisplay({ score, breakdown, animated = true }: RiceScoreDisplayProps) {
+export default function RiceScoreDisplay({
+  score,
+  breakdown,
+  animated = true,
+}: RiceScoreDisplayProps) {
   const category = getRiceScoreCategory(score)
   const colors = categoryColors[category.color as keyof typeof categoryColors]
 
@@ -73,17 +76,15 @@ export function RiceScoreDisplay({ score, breakdown, animated = true }: RiceScor
 
         {/* Score Text Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <motion.div
-            className="text-5xl font-bold"
-            style={{ color: colors.primary }}
-            animate={animated ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ duration: 0.5, delay: 0.6 }}
-          >
+          <SafeMotionDiv className="text-5xl font-bold" style={{ color: colors.primary }}>
             {score}
-          </motion.div>
-          <motion.div className="text-sm text-gray-600 dark:text-gray-400 mt-1" {...categoryMotion}>
+          </SafeMotionDiv>
+          <SafeMotionDiv
+            className="text-sm text-gray-600 dark:text-gray-400 mt-1"
+            {...categoryMotion}
+          >
             RICE Score
-          </motion.div>
+          </SafeMotionDiv>
         </div>
       </SafeMotionDiv>
 

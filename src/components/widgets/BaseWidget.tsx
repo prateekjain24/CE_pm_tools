@@ -17,11 +17,13 @@ export interface BaseWidgetProps<T = unknown> {
   onRefresh?: () => Promise<void>
   onSettings?: () => void
   onHide?: () => void
+  onExpand?: () => void
   children: (data: T) => ReactNode
   className?: string
   // Widget-specific settings
   settings?: Record<string, unknown>
   emptyStateType?: "calculator" | "feed" | "analytics" | "default"
+  viewMode?: "compact" | "full"
 }
 
 /**
@@ -37,10 +39,12 @@ export function BaseWidget<T = unknown>({
   onRefresh,
   onSettings,
   onHide,
+  onExpand,
   children,
   className = "",
   settings,
   emptyStateType = "default",
+  viewMode = "full",
 }: BaseWidgetProps<T>) {
   // Loading state
   if (loading && !data) {
@@ -59,7 +63,9 @@ export function BaseWidget<T = unknown>({
           onRefresh={onRefresh}
           onSettings={onSettings}
           onHide={onHide}
+          onExpand={onExpand}
           loading={loading}
+          viewMode={viewMode}
         />
         <WidgetError error={error} onRetry={onRefresh} />
       </div>
@@ -78,7 +84,9 @@ export function BaseWidget<T = unknown>({
           onRefresh={onRefresh}
           onSettings={onSettings}
           onHide={onHide}
+          onExpand={onExpand}
           loading={loading}
+          viewMode={viewMode}
         />
         <div className="widget-empty p-8 text-center">
           <EmptyStateIllustration type={emptyStateType} />
@@ -128,7 +136,9 @@ export function BaseWidget<T = unknown>({
         onRefresh={onRefresh}
         onSettings={onSettings}
         onHide={onHide}
+        onExpand={onExpand}
         loading={loading}
+        viewMode={viewMode}
       />
       <div className="widget-content">{children(data)}</div>
     </div>

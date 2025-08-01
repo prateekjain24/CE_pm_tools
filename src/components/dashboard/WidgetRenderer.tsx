@@ -6,6 +6,9 @@ import { WidgetSkeleton } from "../widgets/WidgetSkeleton"
 
 interface WidgetRendererProps {
   widget: WidgetConfig
+  activeCalculator?: string | null
+  viewMode?: "compact" | "full"
+  onExpand?: () => void
   onRemove: () => void
   onSettings: () => void
   onHide: () => void
@@ -15,7 +18,15 @@ interface WidgetRendererProps {
  * Dynamically renders widgets based on their type
  * Handles lazy loading, error boundaries, and suspense
  */
-export function WidgetRenderer({ widget, onRemove, onSettings, onHide }: WidgetRendererProps) {
+export function WidgetRenderer({
+  widget,
+  activeCalculator,
+  viewMode = "compact",
+  onExpand,
+  onRemove,
+  onSettings,
+  onHide,
+}: WidgetRendererProps) {
   // Get widget definition from registry
   const widgetDefinition = widgetRegistry.get(widget.type)
 
@@ -69,9 +80,12 @@ export function WidgetRenderer({ widget, onRemove, onSettings, onHide }: WidgetR
           widgetConfig={{
             ...widget.settings,
             customTitle: widget.title,
+            viewMode,
+            onExpand,
             onRemove,
             onSettings,
             onHide,
+            activeCalculator,
           }}
         />
       </Suspense>

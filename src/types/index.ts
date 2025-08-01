@@ -754,6 +754,11 @@ export interface RssFeedItem extends FeedItem {
 // ========== Widget Types ==========
 
 /**
+ * Widget view modes
+ */
+export type WidgetViewMode = "compact" | "full"
+
+/**
  * Widget configuration for dashboard layout
  */
 export interface WidgetConfig {
@@ -764,6 +769,7 @@ export interface WidgetConfig {
   visible: boolean
   title?: string // Custom widget title
   settings?: Record<string, unknown> // Widget-specific settings
+  viewMode?: WidgetViewMode // Current view mode
 }
 
 /**

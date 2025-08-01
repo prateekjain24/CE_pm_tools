@@ -19,7 +19,7 @@ interface RiceBreakdownChartProps {
   animated?: boolean
 }
 
-export function RiceBreakdownChart({
+export default function RiceBreakdownChart({
   reach,
   impact,
   confidence,

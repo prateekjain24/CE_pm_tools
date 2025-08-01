@@ -16,7 +16,7 @@ interface RiceHistoryProps {
   onDelete?: (id: string) => void
 }
 
-export function RiceHistory({
+export default function RiceHistory({
   calculations,
   onClose,
   onCompare,

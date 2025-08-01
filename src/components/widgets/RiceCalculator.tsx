@@ -11,15 +11,9 @@ import { BaseWidget } from "./BaseWidget"
 import { WidgetSkeleton } from "./WidgetSkeleton"
 
 // Lazy load visualization components
-const RiceScoreDisplay = lazy(() =>
-  import("./rice/RiceScoreDisplay").then((m) => ({ default: m.RiceScoreDisplay }))
-)
-const RiceBreakdownChart = lazy(() =>
-  import("./rice/RiceBreakdownChart").then((m) => ({ default: m.RiceBreakdownChart }))
-)
-const RiceHistory = lazy(() =>
-  import("./rice/RiceHistory").then((m) => ({ default: m.RiceHistory }))
-)
+const RiceScoreDisplay = lazy(() => import("./rice/RiceScoreDisplay"))
+const RiceBreakdownChart = lazy(() => import("./rice/RiceBreakdownChart"))
+const RiceHistory = lazy(() => import("./rice/RiceHistory"))
 
 interface RiceCalculatorProps {
   widgetId: string
@@ -61,6 +55,8 @@ const getScoreCategoryStyles = (score: number) => {
 
 export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculatorProps) {
   const [calculations, setCalculations] = useStorage<RiceScore[]>("rice-history", [])
+  const viewMode = (widgetConfig?.viewMode as "compact" | "full") || "full"
+  const onExpand = widgetConfig?.onExpand as (() => void) | undefined
   const [projectName, setProjectName] = useState("")
   const [formData, setFormData] = useState({
     reach: 0,
@@ -147,12 +143,71 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
     await setCalculations(updatedCalculations)
   }
 
+  // Compact view rendering
+  if (viewMode === "compact") {
+    const latestCalculation = calculations[0]
+    const displayScore = latestCalculation || currentScore
+    const displayScoreCategory = getScoreCategoryStyles(displayScore.score)
+
+    return (
+      <BaseWidget
+        widgetId={widgetId}
+        title="RICE Score"
+        data={displayScore}
+        settings={widgetConfig}
+        viewMode={viewMode}
+        onExpand={onExpand}
+        onSettings={widgetConfig?.onSettings as (() => void) | undefined}
+        onHide={widgetConfig?.onHide as (() => void) | undefined}
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>RICE Calculator</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+            />
+          </svg>
+        }
+      >
+        {(data) => (
+          <div className="p-4">
+            <div className="text-center">
+              <div className="mb-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {latestCalculation ? "Latest Score" : "Current Score"}
+                </span>
+              </div>
+              <div className={`text-3xl font-bold ${displayScoreCategory.color}`}>
+                {formatNumber(Math.round(data.score))}
+              </div>
+              <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{data.name}</div>
+              <div
+                className={`mt-2 inline-flex px-2 py-1 rounded-full text-xs font-medium ${displayScoreCategory.bgColor} ${displayScoreCategory.color}`}
+              >
+                {displayScoreCategory.label}
+              </div>
+              {calculations.length > 0 && (
+                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  {calculations.length} saved calculation{calculations.length !== 1 ? "s" : ""}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </BaseWidget>
+    )
+  }
+
   return (
     <BaseWidget
       widgetId={widgetId}
       title="RICE Score Calculator"
       data={currentScore}
       settings={widgetConfig}
+      viewMode={viewMode}
+      onExpand={onExpand}
       onSettings={widgetConfig?.onSettings as () => void}
       onHide={widgetConfig?.onHide as () => void}
       icon={
@@ -374,7 +429,7 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                       confidence: formData.confidence,
                       effort: formData.effort,
                     }}
-                    animated={true}
+                    animated={!widgetConfig?.isModal}
                   />
                 </Suspense>
               </div>
@@ -388,7 +443,7 @@ export default function RiceCalculator({ widgetId, widgetConfig }: RiceCalculato
                     impact={formData.impact}
                     confidence={formData.confidence}
                     effort={formData.effort}
-                    animated={true}
+                    animated={!widgetConfig?.isModal}
                   />
                 </Suspense>
               </div>

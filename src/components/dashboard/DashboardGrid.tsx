@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { calculateResponsiveLayout } from "~/lib/dashboard/defaultLayout"
 import type { WidgetConfig } from "~/types"
 import { WidgetContainer } from "./WidgetContainer"
+import { WidgetModal } from "./WidgetModal"
 import { WidgetSettings } from "./WidgetSettings"
 
 interface DashboardGridProps {
@@ -21,6 +22,7 @@ export function DashboardGrid({
   const [isClient, setIsClient] = useState(false)
   const [screenWidth, setScreenWidth] = useState(1200)
   const [settingsWidget, setSettingsWidget] = useState<WidgetConfig | null>(null)
+  const [expandedWidget, setExpandedWidget] = useState<WidgetConfig | null>(null)
 
   // Handle client-side rendering
   useEffect(() => {
@@ -79,6 +81,10 @@ export function DashboardGrid({
           }}
           widget={widget}
           activeCalculator={activeCalculator}
+          viewMode={widget.viewMode || "compact"}
+          onExpand={() => {
+            setExpandedWidget(widget)
+          }}
           onRemove={() => {
             // Remove widget completely
             const updatedLayout = layout.filter((w) => w.id !== widget.id)
@@ -131,6 +137,13 @@ export function DashboardGrid({
           }}
         />
       )}
+
+      {/* Widget Expanded Modal */}
+      <WidgetModal
+        widget={expandedWidget}
+        open={!!expandedWidget}
+        onClose={() => setExpandedWidget(null)}
+      />
     </div>
   )
 }
